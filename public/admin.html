@@ -96,6 +96,8 @@
   .vis { font-size: 13px; padding: 2px 10px; border-radius: 99px; border: 1px solid var(--line); white-space: nowrap; }
   .vis.hidden-p { color: var(--muted); }
   .vis.shown { color: var(--p1); border-color: var(--p1); }
+  .node-warn { padding: 10px 16px; background: #3a1616; border-bottom: 1px solid var(--bad); color: #ffb3b3; font-size: 15px; font-weight: 600; }
+  .node-warn[hidden] { display: none; }
   .lan { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 5px 16px; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--muted); }
   .lan code { font-family: var(--mono); color: var(--text); font-size: 14px; user-select: all; }
   .board { display: flex; gap: 6px; align-items: center; padding: 6px 16px; border-bottom: 1px solid var(--line); background: var(--panel-2); overflow-x: auto; font-size: 14px; }
@@ -142,6 +144,7 @@
 </header>
 
 <div class="winner-bar" id="winnerBar" hidden></div>
+<div class="node-warn" id="nodeWarn" hidden></div>
 <div class="lan" id="lan" hidden></div>
 <div class="board" id="board" hidden><span class="lbl">อันดับ</span></div>
 <details class="roster" id="rosterPanel">
@@ -455,6 +458,10 @@ function login(pw) {
     publishedId = s.publishedId; currentId = s.publishedId; savedText = s.publishedId ? s.source : null;
     bank = s.bank; renderBank(); refreshPreview();
     renderLan(s.lanUrls);
+    if (s.node && !s.node.ok) {
+      $('nodeWarn').hidden = false;
+      $('nodeWarn').textContent = `⚠ ความปลอดภัย: ${s.node.message} — อัปเดต Node.js แล้วรีสตาร์ตเซิร์ฟเวอร์ (ดู README หัวข้อ "อัปเดต Node.js")`;
+    }
     lanBase = s.lanUrls?.[0] || location.origin;
     if (s.stage) renderStage(s.stage);
     const ex = $('exec');

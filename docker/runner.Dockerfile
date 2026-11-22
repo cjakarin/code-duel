@@ -1,8 +1,11 @@
 # Code Duel v2 — image สำหรับรันโค้ดของผู้เล่น (Python 3 + g++ ของ GNU)
-# สร้างด้วย: npm run build-runner
+# สร้างด้วย: npm run build-runner (ใช้ --pull ดึง image ฐานรุ่นล่าสุดที่แก้ช่องโหว่แล้ว)
+# ควรสร้างใหม่ทุกต้นภาคเรียน หรือเมื่อมีประกาศช่องโหว่ของ Python/Debian
 FROM python:3.12-slim-bookworm
 
+# upgrade = ดึงแพตช์ความปลอดภัยล่าสุดของ Debian ทุกครั้งที่สร้าง image ใหม่
 RUN apt-get update \
+ && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends g++ \
  && rm -rf /var/lib/apt/lists/*
 

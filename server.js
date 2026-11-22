@@ -11,6 +11,8 @@ const crypto = require('crypto');
 const createSandbox = require('./sandbox');
 const insight = require('./insight');
 const createStage = require('./stage');
+const { checkNode } = require('./node-check');
+const nodeStatus = checkNode();
 
 // ---------- ค่าตั้งต้น (เปลี่ยนได้ผ่าน environment variables) ----------
 const PORT = Number(process.env.PORT || 3000);
@@ -287,6 +289,7 @@ const adminState = () => ({
   publishedId: state.publishedId, bank: bankList(), lanUrls: lanUrls(),
   executor: { mode: sandbox.mode, info: sandboxInfo },
   stage: stage?.adminState() ?? null,
+  node: nodeStatus,
   players: Object.fromEntries(slots().map((s) => [s, { ...playerMeta(state.players[s]), code: state.players[s].code, console: state.players[s].console }])),
 });
 const rosterForAdmin = () => Object.fromEntries(slots().map((s) => [s, {
@@ -921,6 +924,19 @@ server.on('error', (e) => {
 });
 
 (async () => {
+  // ตรวจรุ่น Node.js ก่อนเปิดรับการเชื่อมต่อ: รุ่นที่มีช่องโหว่ที่ประกาศแล้วจะไม่ยอมเริ่ม
+  if (!nodeStatus.ok) {
+    const bar = '!'.repeat(64);
+    console.error(`\n${bar}\n✖ ${nodeStatus.message}`);
+    console.error('  วิธีอัปเดต: ดูหัวข้อ "อัปเดต Node.js" ใน README.md หรือ https://nodejs.org/en/download');
+    if (process.env.ALLOW_INSECURE_NODE !== '1') {
+      console.error('  (ถ้าจำเป็นต้องรันชั่วคราวจริง ๆ: ALLOW_INSECURE_NODE=1 npm start — ไม่แนะนำ)');
+      console.error(bar + '\n');
+      process.exit(1);
+    }
+    console.error('  ⚠ ALLOW_INSECURE_NODE=1 — รันต่อทั้งที่มีความเสี่ยง หน้า admin จะแสดงคำเตือน');
+    console.error(bar + '\n');
+  }
   const chk = await sandbox.check();
   if (!chk.ok) {
     console.error('\n✖ เริ่มระบบไม่ได้: ' + chk.message);
@@ -933,7 +949,7 @@ server.on('error', (e) => {
   server.listen(PORT, HOST, () => {
     const lan = lanAddresses();
     console.log(`Code Duel v${require('./package.json').version} พร้อมใช้งาน`);
-    console.log(`  Node.js ${process.version} — ตรวจว่าเป็นรุ่นล่าสุดของสายนี้ที่ https://nodejs.org`);
+    console.log(`  ${nodeStatus.ok ? '✔' : '⚠'} ${nodeStatus.message}`);
     console.log(`  ที่รันโค้ด : ${sandboxInfo}`);
     console.log(`  เครื่องนี้ : http://localhost:${PORT}/admin.html  (รหัสผู้ดูแล: ${ADMIN_PASSWORD})`);
     if (!lan.length) console.log('  ไม่พบการ์ดเครือข่าย — ตรวจว่าเครื่องต่อวงแลน/Wi-Fi แล้ว');
