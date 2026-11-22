@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code Duel — ผู้เล่น</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" media="print" onload="this.media='all'"><!-- ฟอนต์จากอินเทอร์เน็ต ถ้าไม่มีเน็ตจะใช้ฟอนต์ของเครื่องแทน -->
+<link rel="stylesheet" href="/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="style.css">
+<style>
+  .countdown { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(10, 15, 25, .82); color: #fff; font: 700 min(38vw, 300px)/1 var(--mono); }
+  .countdown[hidden] { display: none; }
+  .countdown.pop { animation: pop .9s ease-out; }
+  @keyframes pop { 0% { transform: scale(1.6); opacity: 0; } 30% { transform: scale(1); opacity: 1; } 100% { transform: scale(.94); opacity: .9; } }
+  @media (prefers-reduced-motion: reduce) { .countdown.pop { animation: none; } }
+  .topbar a.toplink { color: var(--muted); text-decoration: none; font-size: 14px; }
+  .topbar a.toplink:hover { color: var(--text); }
+  .result-note { margin: 0; color: #9fd8ff; font-size: 14px; }
+</style>
+<style>
+  body { display: flex; flex-direction: column; }
+  .me { font-weight: 600; }
+  /* ---------- เลย์เอาต์: โจทย์ซ้าย | โค้ดขวา ปรับขนาด/ยุบ/ขยายได้ ---------- */
+  main { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--pw, 38%) 6px minmax(0, 1fr); }
+  main.p-collapsed { grid-template-columns: 30px 0 minmax(0, 1fr); }
+  main.w-collapsed { grid-template-columns: minmax(0, 1fr) 0 30px; }
+
+  .pane-head, .toolbar, .console-head { display: flex; align-items: center; gap: 6px; background: var(--panel-2); min-height: 38px; }
+  .pane-head { padding: 4px 8px 4px 16px; border-bottom: 1px solid var(--line); }
+  .pane-title { font-weight: 600; font-size: 14px; }
+  .pbtn { background: none; border: 1px solid transparent; border-radius: 5px; color: var(--muted); cursor: pointer; padding: 2px 8px; font-size: 13px; white-space: nowrap; }
+  .pbtn:hover { color: var(--text); border-color: var(--line); }
+
+  .problem-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .problem { flex: 1; overflow: auto; padding: 18px 24px; }
+  .code-input { font-family: var(--mono); font-size: 20px; letter-spacing: 2px; text-transform: uppercase; text-align: center; }
+  .round-pill { font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px; }
+  .result-dialog { width: min(560px, 94vw); max-height: 90vh; overflow: auto; }
+  .result-sub { margin: -6px 0 0; color: var(--muted); font-size: 14px; }
+  .result-me { font-size: 17px; padding: 10px 12px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); }
+  .result-me b { font-size: 22px; }
+  .table-wrap { overflow-x: auto; }
+  .result-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .result-table th { text-align: left; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); padding: 4px 8px; }
+  .result-table td { padding: 5px 8px; border-bottom: 1px solid var(--line); }
+  .result-table td.num { font-family: var(--mono); text-align: right; white-space: nowrap; }
+  .result-table tr.mine td { background: rgba(108, 182, 255, .12); font-weight: 600; }
+  .waiting { height: 100%; display: grid; place-content: center; text-align: center; gap: 6px; color: var(--muted); padding: 24px; }
+  .waiting h2 { margin: 0; color: var(--text); font-size: 20px; }
+  .waiting p { margin: 0; max-width: 34ch; }
+  .waiting-icon { font-size: 36px; }
+  .problem.reveal { animation: reveal 1.2s ease-out; }
+  @keyframes reveal { from { background: rgba(95, 208, 143, .14); } to { background: transparent; } }
+  @media (prefers-reduced-motion: reduce) { .problem.reveal { animation: none; } }
+  .work { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .toolbar { padding: 4px 8px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  #editor { flex: 1; min-height: 0; }
+  .console-wrap { height: var(--ch, 36%); min-height: 0; display: flex; flex-direction: column; }
+  .console-head { padding: 2px 8px 2px 12px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }
+  #console { flex: 1; min-height: 0; }
+  .stdin-row { display: flex; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--line); background: var(--panel-2); }
+  .stdin-row input { flex: 1; font-family: var(--mono); font-size: 13px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+  .dot.on { background: var(--ok); }
+
+  /* ตัวลากปรับขนาด */
+  .splitter { background: var(--line); position: relative; touch-action: none; }
+  .splitter::after { content: ''; position: absolute; background: var(--muted); border-radius: 2px; opacity: 0; transition: opacity .15s; }
+  .splitter:hover::after, .splitter.drag::after { opacity: .8; }
+  .splitter.v { cursor: col-resize; }
+  .splitter.v::after { width: 2px; height: 32px; top: 50%; left: 2px; margin-top: -16px; }
+  .splitter.h { height: 6px; cursor: row-resize; flex: none; }
+  .splitter.h::after { height: 2px; width: 32px; left: 50%; top: 2px; margin-left: -16px; }
+  body.dragging { user-select: none; }
+  body.dragging iframe, body.dragging #editor { pointer-events: none; }
+
+  /* แถบแนวตั้งเมื่อยุบทั้งฝั่ง */
+  .ptoggle { color: var(--text); border-color: var(--line); }
+  .rail { display: none; width: 100%; height: 100%; background: var(--panel-2); border: 0; color: var(--muted); cursor: pointer; font: 600 13px var(--sans); writing-mode: vertical-rl; letter-spacing: 1px; padding: 12px 0; }
+  .rail:hover { color: var(--text); background: var(--panel); }
+  main.p-collapsed .problem-pane > :not(.rail),
+  main.w-collapsed .work > :not(.rail) { display: none; }
+  main.p-collapsed .problem-pane > .rail, main.w-collapsed .work > .rail { display: block; }
+  main.p-collapsed #splitV, main.w-collapsed #splitV { visibility: hidden; }
+  .problem-pane > .rail { border-right: 1px solid var(--line); }
+  .work > .rail { border-left: 1px solid var(--line); }
+
+  /* ยุบตัวเขียนโค้ด / console */
+  .work.e-collapsed #editor, .work.e-collapsed #splitH { display: none; }
+  .work.e-collapsed .console-wrap { flex: 1; height: auto; }
+  .work.c-collapsed .console-wrap { height: auto; flex: none; }
+  .work.c-collapsed #console, .work.c-collapsed .stdin-row, .work.c-collapsed #splitH { display: none; }
+
+  @media (max-width: 720px) {
+    main, main.p-collapsed, main.w-collapsed { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); overflow: auto; }
+    #splitV { display: none; }
+    .problem-pane { max-height: 45vh; border-bottom: 1px solid var(--line); }
+    .work { min-height: 75vh; }
+    .rail { writing-mode: horizontal-tb; padding: 8px; height: auto; }
+    #splitH { display: none; }
+    .console-wrap { height: 38vh; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="v">Code</span> <span class="s">Duel</span></div>
+  <div class="me" id="me">ยังไม่ได้เข้าร่วม</div>
+  <div class="spacer"></div>
+  <span class="muted" style="color:var(--muted);font-size:14px">คะแนน <span class="score" id="score">-</span></span>
+  <a class="toplink" href="scoreboard.html" target="_blank" title="เปิดตารางคะแนนในแท็บใหม่">📊 ตารางคะแนน</a>
+  <button class="pbtn" type="button" id="mute" title="เปิด/ปิดเสียง">🔊</button>
+  <span class="round-pill" id="roundPill" hidden></span>
+  <span class="status-pill" id="status">รอเริ่ม</span>
+  <div class="clock" id="clock">--:--</div>
+</header>
+<div class="winner-bar" id="winnerBar" hidden></div>
+
+<main id="layout">
+  <section class="problem-pane" aria-label="โจทย์">
+    <div class="pane-head">
+      <span class="pane-title">โจทย์</span>
+      <div class="spacer"></div>
+      <button class="pbtn" type="button" data-max="problem" title="ขยายโจทย์เต็มหน้าจอ">ขยาย</button>
+      <button class="pbtn" type="button" data-collapse="problem" title="ยุบโจทย์ไปด้านซ้าย">ยุบ ◂</button>
+    </div>
+    <div class="problem md" id="problem"></div>
+    <button class="rail" type="button" data-open="problem" title="แสดงโจทย์">▸ โจทย์</button>
+  </section>
+
+  <div class="splitter v" id="splitV" role="separator" aria-orientation="vertical" title="ลากเพื่อปรับขนาด (ดับเบิลคลิกเพื่อคืนค่า)"></div>
+
+  <section class="work" id="work">
+    <button class="rail" type="button" data-open="work" title="แสดงโค้ด">◂ โค้ด</button>
+    <div class="toolbar">
+      <button class="pbtn ptoggle" type="button" id="toggleProblem" title="ซ่อน/แสดงโจทย์ (Ctrl+B)">◂ ซ่อนโจทย์</button>
+      <select id="lang" aria-label="ภาษา">
+        <option value="python">Python 3</option>
+        <option value="cpp">C++17</option>
+      </select>
+      <div class="spacer"></div>
+      <button class="btn" id="run" title="Ctrl+Enter">รันโค้ด</button>
+      <button class="btn stop" id="stop" hidden>หยุด</button>
+      <button class="btn go" id="submit" title="ตรวจกับเทสเคสลับ (Ctrl+Shift+Enter)">ส่งคำตอบ</button>
+      <button class="pbtn" type="button" data-max="code" title="ขยายโค้ดเต็มหน้าจอ">ขยาย</button>
+      <button class="pbtn" type="button" data-collapse="editor" title="ยุบตัวเขียนโค้ด">ยุบ ▴</button>
+    </div>
+    <div id="editor"></div>
+    <div class="splitter h" id="splitH" role="separator" aria-orientation="horizontal" title="ลากเพื่อปรับขนาด (ดับเบิลคลิกเพื่อคืนค่า)"></div>
+    <div class="console-wrap">
+      <div class="console-head">
+        <span class="dot" id="runDot"></span><span id="runText">Console</span>
+        <div class="spacer"></div>
+        <button class="pbtn" type="button" id="clear">ล้าง</button>
+        <button class="pbtn" type="button" data-max="console" title="ขยาย console เต็มหน้าจอ">ขยาย</button>
+        <button class="pbtn" type="button" data-collapse="console" title="ยุบ console">ยุบ ▾</button>
+      </div>
+      <div class="console" id="console" aria-live="polite"></div>
+      <form class="stdin-row" id="stdinForm">
+        <input type="text" id="stdin" placeholder="พิมพ์ข้อมูลเข้า แล้วกด Enter (ใช้ได้ขณะโปรแกรมทำงาน)" autocomplete="off" disabled>
+        <button class="btn" type="submit" id="send" disabled>ส่ง</button>
+        <button class="btn" type="button" id="eof" disabled title="ปิดการรับข้อมูล (สำหรับโปรแกรมที่อ่านจนจบไฟล์)">EOF</button>
+      </form>
+    </div>
+  </section>
+</main>
+
+<div class="overlay" id="joinOverlay">
+  <form class="dialog" id="joinForm">
+    <h2>เข้าร่วมการแข่งขัน</h2>
+    <label>รหัสเข้าใช้ (จากผู้ดูแล)
+      <input type="text" id="accessCode" class="code-input" maxlength="12" placeholder="เช่น K7P-3MX" autocomplete="off" autocapitalize="characters" spellcheck="false" required autofocus>
+    </label>
+    <label id="nameRow" hidden>ชื่อของคุณ <input type="text" id="name" maxlength="40" autocomplete="name"></label>
+    <p class="error" id="joinErr"></p>
+    <button class="btn go" type="submit">เข้าร่วม</button>
+  </form>
+</div>
+
+<div class="countdown" id="cd" hidden></div>
+<div class="overlay" id="resultOverlay" hidden>
+  <div class="dialog result-dialog" role="dialog" aria-labelledby="resultTitle">
+    <h2 id="resultTitle"></h2>
+    <p class="result-sub" id="resultSub"></p>
+    <p class="result-note" id="resultNote" hidden>🧊 ตารางคะแนนถูกแช่แข็ง — อันดับจะประกาศบนจอเมื่อผู้ดูแลเปิดผล</p>
+    <div class="result-me" id="resultMe"></div>
+    <div class="table-wrap"><table class="result-table" id="resultTable"></table></div>
+    <button class="btn" type="button" id="resultClose">ปิด</button>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/vendor/marked.min.js"></script>
+<script src="/vendor/purify.min.js"></script>
+<script src="/vendor/katex/katex.min.js"></script>
+<script src="problem-view.js"></script>
+<script src="stage-common.js"></script>
+<script src="/vendor/monaco/vs/loader.js"></script>
+<script>
+const MONACO = location.origin + '/vendor/monaco/';
+window.MonacoEnvironment = { getWorkerUrl: () => 'data:text/javascript;charset=utf-8,' + encodeURIComponent(
+  `self.MonacoEnvironment={baseUrl:'${MONACO}'};importScripts('${MONACO}vs/base/worker/workerMain.js');`) };
+
+const $ = (id) => document.getElementById(id);
+const socket = io();
+let editor, me = null, templates = {}, codes = {}, match = { status: 'waiting' }, sendTimer;
+let busy = { running: false, judging: false };
+
+// ---------- โจทย์ ----------
+socket.on('problem', (p) => {
+  if (p.hidden) {
+    const box = $('problem');
+    box.replaceChildren();
+    const wait = document.createElement('div'); wait.className = 'waiting';
+    const icon = document.createElement('div'); icon.className = 'waiting-icon'; icon.textContent = '⏳';
+    const h = document.createElement('h2'); h.textContent = 'โจทย์ยังไม่เปิด';
+    const t = document.createElement('p'); t.textContent = 'โจทย์จะแสดงที่นี่ทันทีเมื่อผู้ดูแลกดเริ่มการแข่งขัน ระหว่างนี้เลือกภาษาและเตรียมโค้ดเริ่มต้นไว้ได้';
+    wait.append(icon, h, t); box.appendChild(wait);
+    document.title = 'รอเริ่ม — Code Duel';
+    updateButtons();
+    return;
+  }
+  const wasHidden = $('problem').querySelector('.waiting');
+  renderProblem($('problem'), p, (input) => run(input));
+  if (wasHidden) { // เพิ่งเปิดโจทย์ → ให้เห็นโจทย์แน่ ๆ แม้ยุบไว้
+    if (!layout.p) { layout.p = true; applyLayout(); }
+    $('problem').scrollTop = 0;
+    $('problem').classList.add('reveal');
+    setTimeout(() => $('problem').classList.remove('reveal'), 1200);
+  }
+  document.title = `${p.title} — Code Duel`;
+  updateButtons();
+});
+
+// ---------- คะแนน / ผู้ชนะ ----------
+function setScore(best) {
+  const el = $('score');
+  el.textContent = best ? `${best.passed}/${best.total}` : '-';
+  el.classList.toggle('full', !!best && best.passed === best.total);
+}
+socket.on('score', ({ best }) => {
+  const wasFull = $('score').classList.contains('full');
+  setScore(best);
+  if (best && best.total && best.passed === best.total && !wasFull) Stage.Sound.ok();
+});
+socket.on('winner', (w) => {
+  const bar = $('winnerBar');
+  bar.hidden = !w;
+  if (!w) return;
+  const t = Math.round(w.elapsedMs / 1000);
+  const who = me && me.slot === w.slot ? 'คุณ' : w.name;
+  bar.textContent = `🏆 ${who} ผ่านทุกเทสเคสเป็นคนแรก (${Math.floor(t / 60)} นาที ${t % 60} วินาที)`;
+});
+
+// ---------- เวลาแข่ง ----------
+socket.on('match', (m) => {
+  Stage.Clock.sync(m.serverNow);
+  const fresh = m.status === 'running' && m.startedAt !== match.startedAt;
+  match = m; renderMatch();
+  if (fresh && m.startedAt - Stage.Clock.now() > 0) {
+    Stage.countdown($('cd'), m.startedAt, (n) => { if (n > 0) Stage.Sound.tick(); else { Stage.Sound.go(); updateButtons(); } });
+    setTimeout(updateButtons, m.startedAt - Stage.Clock.now() + 50);
+  }
+});
+function renderMatch() {
+  $('roundPill').hidden = !match.round;
+  $('roundPill').textContent = match.round ? `รอบที่ ${match.round}` : '';
+  if (match.status === 'running') $('resultOverlay').hidden = true;
+  const st = $('status');
+  st.className = 'status-pill ' + match.status;
+  st.textContent = { waiting: 'รอเริ่ม', running: 'กำลังแข่ง', ended: 'หมดเวลา' }[match.status];
+  editor?.updateOptions({ readOnly: match.status === 'ended' });
+  updateButtons();
+}
+setInterval(() => {
+  const c = $('clock');
+  if (match.status !== 'running') { c.textContent = match.status === 'ended' ? '00:00' : '--:--'; c.classList.remove('low'); return; }
+  const left = Math.min(match.durationMin * 60000, match.startedAt + match.durationMin * 60000 - Stage.Clock.now());
+  const s = Math.floor(Math.max(0, left) / 1000);
+  c.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  c.classList.toggle('low', s < 60);
+  if (s < 10 && s >= 0 && s !== window._lastTick && match.startedAt <= Stage.Clock.now()) { window._lastTick = s; Stage.Sound.tick(); }
+}, 250);
+
+// ---------- เข้าร่วมด้วยรหัสเข้าใช้ ----------
+const COLORS = ['#f2b84b', '#6cb6ff', '#5fd08f', '#ff8fa3', '#b69cff', '#4fd1c5', '#ff9f5a', '#e2e86c'];
+const colorOf = (slot) => COLORS[(slot - 1) % COLORS.length];
+$('accessCode').addEventListener('input', (e) => {   // จัดรูปแบบเป็น XXX-XXX ระหว่างพิมพ์
+  const raw = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  e.target.value = raw.length > 3 ? raw.slice(0, 3) + '-' + raw.slice(3) : raw;
+});
+$('joinForm').onsubmit = (e) => {
+  e.preventDefault();
+  join($('accessCode').value, $('name').value);
+};
+function showMe() {
+  $('me').textContent = me ? me.name : 'ยังไม่ได้เข้าร่วม';
+  $('me').style.color = me ? colorOf(me.slot) : '';
+}
+function join(accessCode, name) {
+  socket.emit('player:join', { accessCode, name }, (res) => {
+    if (!res.ok) {
+      $('joinErr').textContent = res.error;
+      $('joinOverlay').hidden = false;
+      if (res.needName) { $('nameRow').hidden = false; $('name').focus(); }
+      if (res.badCode) { sessionStorage.removeItem('duel-me'); $('accessCode').value = accessCode; $('accessCode').select(); }
+      return;
+    }
+    me = { slot: res.slot, name: res.name, accessCode: res.accessCode };
+    sessionStorage.setItem('duel-me', JSON.stringify({ accessCode: res.accessCode }));
+    templates = res.templates;
+    codes = { python: templates.python, cpp: templates.cpp, [res.lang]: res.code };
+    showMe();
+    $('joinErr').textContent = '';
+    $('nameRow').hidden = true;
+    $('joinOverlay').hidden = true;
+    $('lang').value = res.lang;
+    setScore(res.best);
+    if (res.lastResult) showResult(res.lastResult);
+    whenEditor(() => {
+      setModel(res.lang, res.code);
+      $('console').replaceChildren();
+      res.console.forEach(addConsole);
+      setBusy({ running: res.running, judging: res.judging });
+    });
+  });
+}
+socket.on('connect', () => {
+  const saved = JSON.parse(sessionStorage.getItem('duel-me') || 'null');
+  if (saved?.accessCode) join(saved.accessCode, ''); // เชื่อมต่อใหม่อัตโนมัติ
+});
+socket.on('me:name', (name) => { if (me) { me.name = name; showMe(); } });
+socket.on('kicked', (reason) => {
+  sessionStorage.removeItem('duel-me'); me = null;
+  showMe();
+  $('joinErr').textContent = reason || 'ผู้ดูแลนำคุณออกจากระบบ';
+  $('accessCode').value = '';
+  $('joinOverlay').hidden = false;
+  updateButtons();
+});
+
+// ---------- สรุปผลเมื่อจบรอบ ----------
+const fmtTime = (ms) => {
+  if (ms == null) return '-';
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+function showResult(r) {
+  $('resultTitle').textContent = r.frozen ? `ผลของคุณ รอบที่ ${r.no}` : `สรุปผลรอบที่ ${r.no}`;
+  $('resultNote').hidden = !r.frozen;
+  $('resultSub').textContent = r.title;
+  const mine = me && r.rows.find((x) => x.slot === me.slot);
+  const meBox = $('resultMe');
+  meBox.hidden = !mine;
+  if (mine) {
+    if (r.frozen) {
+      meBox.replaceChildren(`ผ่าน ${mine.passed}/${mine.total} ชุด (${mine.points} คะแนน)`);
+    } else {
+      meBox.replaceChildren('คุณได้อันดับ ');
+      const b = document.createElement('b'); b.textContent = mine.rank; meBox.appendChild(b);
+      meBox.append(` จาก ${r.rows.length} คน — ผ่าน ${mine.passed}/${mine.total} ชุด (${mine.points} คะแนน)`);
+    }
+  }
+  const t = $('resultTable');
+  t.replaceChildren();
+  t.hidden = !!r.frozen;
+  const head = t.createTHead().insertRow();
+  for (const h of ['อันดับ', 'ชื่อ', 'ผ่าน', 'คะแนน', 'เวลา']) { const th = document.createElement('th'); th.textContent = h; head.appendChild(th); }
+  const body = t.createTBody();
+  for (const row of r.rows) {
+    const tr = body.insertRow();
+    if (mine && row.slot === mine.slot) tr.className = 'mine';
+    const cells = [[row.rank, 'num'], [row.name, ''], [`${row.passed}/${row.total}`, 'num'], [row.points, 'num'], [fmtTime(row.timeMs), 'num']];
+    for (const [v, cls] of cells) { const td = tr.insertCell(); td.textContent = v; td.className = cls; }
+  }
+  $('resultOverlay').hidden = false;
+  $('resultClose').focus();
+}
+socket.on('round:result', showResult);
+$('resultClose').onclick = () => { $('resultOverlay').hidden = true; };
+$('resultOverlay').addEventListener('click', (e) => { if (e.target === $('resultOverlay')) $('resultOverlay').hidden = true; });
+
+// ---------- editor ----------
+let editorReady = [];
+function whenEditor(fn) { editor ? fn() : editorReady.push(fn); }
+require.config({ paths: { vs: MONACO + 'vs' } });
+require(['vs/editor/editor.main'], () => {
+  editor = monaco.editor.create($('editor'), {
+    value: '', language: 'python', theme: 'vs-dark', automaticLayout: true,
+    fontFamily: 'JetBrains Mono, Consolas, monospace', fontSize: 14, minimap: { enabled: false },
+    tabSize: 4, scrollBeyondLastLine: false,
+  });
+  editor.onDidChangeModelContent(() => {
+    codes[$('lang').value] = editor.getValue();
+    clearTimeout(sendTimer);
+    sendTimer = setTimeout(pushCode, 250);
+  });
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => run());
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => submit());
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => toggleProblem());
+  editorReady.forEach((f) => f()); editorReady = [];
+  renderMatch();
+});
+function setModel(lang, code) {
+  monaco.editor.setModelLanguage(editor.getModel(), lang === 'cpp' ? 'cpp' : 'python');
+  editor.setValue(code);
+}
+function pushCode() { if (me && editor) socket.emit('code:update', { code: editor.getValue(), lang: $('lang').value }); }
+$('lang').onchange = () => { setModel($('lang').value, codes[$('lang').value]); pushCode(); };
+socket.on('code:reset', ({ code, lang }) => {
+  codes = { ...templates, [lang]: code }; $('lang').value = lang; setModel(lang, code);
+});
+
+// ---------- เลย์เอาต์: ยุบ / ขยาย / ลากปรับขนาด ----------
+const DEFAULT_LAYOUT = { p: true, w: true, e: true, c: true, pw: null, ch: null };
+const layout = (() => {
+  try { return { ...DEFAULT_LAYOUT, ...JSON.parse(localStorage.getItem('duel-layout') || '{}') }; }
+  catch (_) { return { ...DEFAULT_LAYOUT }; }
+})();
+const saveLayout = () => { try { localStorage.setItem('duel-layout', JSON.stringify(layout)); } catch (_) {} };
+const isMax = {
+  problem: () => layout.p && !layout.w,
+  code: () => layout.w && layout.e && !layout.p && !layout.c,
+  console: () => layout.w && layout.c && !layout.p && !layout.e,
+};
+
+function applyLayout() {
+  const main = $('layout'), work = $('work');
+  main.classList.toggle('p-collapsed', !layout.p);
+  main.classList.toggle('w-collapsed', !layout.w);
+  work.classList.toggle('e-collapsed', !layout.e);
+  work.classList.toggle('c-collapsed', !layout.c);
+  main.style.setProperty('--pw', layout.pw ? layout.pw + 'px' : '38%');
+  $('toggleProblem').textContent = layout.p ? '◂ ซ่อนโจทย์' : '▸ แสดงโจทย์';
+  work.style.setProperty('--ch', layout.ch ? layout.ch * 100 + '%' : '36%');
+  document.querySelectorAll('[data-max]').forEach((b) => {
+    const on = isMax[b.dataset.max]();
+    b.textContent = on ? 'คืนค่า' : 'ขยาย';
+    b.dataset.t ??= b.title;
+    b.title = on ? 'คืนเลย์เอาต์ปกติ' : b.dataset.t;
+  });
+  saveLayout();
+}
+function toggleProblem() {
+  if (layout.p) Object.assign(layout, { p: false, w: true });
+  else layout.p = true;
+  applyLayout();
+}
+$('toggleProblem').onclick = toggleProblem;
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleProblem(); }
+});
+function restore() { Object.assign(layout, { p: true, w: true, e: true, c: true }); applyLayout(); }
+
+document.querySelectorAll('[data-max]').forEach((b) => b.onclick = () => {
+  const which = b.dataset.max;
+  if (isMax[which]()) return restore();
+  if (which === 'problem') Object.assign(layout, { p: true, w: false });
+  if (which === 'code') Object.assign(layout, { p: false, w: true, e: true, c: false });
+  if (which === 'console') Object.assign(layout, { p: false, w: true, e: false, c: true });
+  applyLayout();
+});
+document.querySelectorAll('[data-collapse]').forEach((b) => b.onclick = () => {
+  const which = b.dataset.collapse;
+  if (which === 'problem') Object.assign(layout, { p: false, w: true });       // อย่างน้อยต้องเห็นอีกฝั่ง
+  if (which === 'editor') Object.assign(layout, { e: false, c: true });
+  if (which === 'console') Object.assign(layout, { c: false, e: true });
+  applyLayout();
+});
+document.querySelectorAll('[data-open]').forEach((b) => b.onclick = () => {
+  layout[b.dataset.open === 'problem' ? 'p' : 'w'] = true;
+  applyLayout();
+});
+// คลิกหัว console ที่ยุบอยู่ = เปิด
+document.querySelector('.console-head').addEventListener('click', (e) => {
+  if (!layout.c && !e.target.closest('button')) { layout.c = true; applyLayout(); }
+});
+
+// ลากเส้นแบ่งเพื่อปรับขนาด
+function dragSplitter(el, onMove) {
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    el.setPointerCapture(e.pointerId);
+    el.classList.add('drag'); document.body.classList.add('dragging');
+    const move = (ev) => onMove(ev);
+    const up = () => {
+      el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up);
+      el.classList.remove('drag'); document.body.classList.remove('dragging');
+      saveLayout();
+    };
+    el.addEventListener('pointermove', move); el.addEventListener('pointerup', up);
+  });
+}
+dragSplitter($('splitV'), (e) => {
+  const r = $('layout').getBoundingClientRect();
+  layout.pw = Math.round(Math.max(240, Math.min(r.width - 360, e.clientX - r.left)));
+  $('layout').style.setProperty('--pw', layout.pw + 'px');
+});
+dragSplitter($('splitH'), (e) => {
+  const work = $('work'), r = work.getBoundingClientRect();
+  const top = $('editor').getBoundingClientRect().top;
+  const h = Math.max(80, Math.min(r.bottom - top - 100, r.bottom - e.clientY));
+  layout.ch = h / r.height;
+  work.style.setProperty('--ch', layout.ch * 100 + '%');
+});
+$('splitV').ondblclick = () => { layout.pw = null; applyLayout(); };
+$('splitH').ondblclick = () => { layout.ch = null; applyLayout(); };
+applyLayout();
+
+// เมื่อเริ่มรัน/ตรวจ ให้ console แสดงเสมอ จะได้เห็นผล
+function revealConsole() {
+  if (!layout.w || !layout.c) { layout.w = true; layout.c = true; applyLayout(); }
+}
+
+// ---------- เสียง: เปิดเมื่อผู้ใช้กด/พิมพ์ครั้งแรก (ข้อกำหนดของเบราว์เซอร์) ----------
+let muted = false;
+try { muted = localStorage.getItem('duel-mute') === '1'; } catch (_) {}
+const syncMute = () => { $('mute').textContent = muted ? '🔇' : '🔊'; if (muted) Stage.Sound.disable(); };
+syncMute();
+const armSound = () => { if (!muted) Stage.Sound.enable(); };
+document.addEventListener('pointerdown', armSound, { once: true, capture: true });
+document.addEventListener('keydown', armSound, { once: true, capture: true });
+$('mute').onclick = () => {
+  muted = !muted;
+  try { localStorage.setItem('duel-mute', muted ? '1' : '0'); } catch (_) {}
+  if (!muted) Stage.Sound.enable();
+  syncMute();
+};
+
+// ---------- รันโค้ด / ส่งคำตอบ ----------
+const canAct = () => me && match.status === 'running' && Stage.Clock.now() >= (match.startedAt || 0) && !busy.running && !busy.judging;
+function run(stdin) {
+  if (!canAct()) return;
+  clearTimeout(sendTimer); pushCode();
+  revealConsole();
+  socket.emit('run', stdin === undefined ? {} : { stdin });
+}
+function submit() {
+  if (!canAct()) return;
+  clearTimeout(sendTimer); pushCode();
+  revealConsole();
+  socket.emit('submit');
+}
+$('run').onclick = () => run();
+$('submit').onclick = () => submit();
+$('stop').onclick = () => socket.emit('stop');
+$('clear').onclick = (e) => { e.stopPropagation(); $('console').replaceChildren(); };
+$('stdinForm').onsubmit = (e) => {
+  e.preventDefault();
+  socket.emit('stdin', $('stdin').value + '\n');
+  $('stdin').value = '';
+};
+$('eof').onclick = () => socket.emit('stdin:eof');
+
+function addConsole({ type, text }) {
+  const box = $('console');
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  const span = document.createElement('span');
+  span.className = type; span.textContent = text;
+  box.appendChild(span);
+  if (atBottom) box.scrollTop = box.scrollHeight;
+}
+socket.on('console', addConsole);
+socket.on('console:clear', () => $('console').replaceChildren());
+socket.on('busy', setBusy);
+function setBusy(b) {
+  busy = b;
+  const r = b.running;
+  $('runDot').classList.toggle('on', r || b.judging);
+  $('runText').textContent = b.judging ? 'กำลังตรวจคำตอบ...' : r ? 'กำลังทำงาน — พิมพ์ข้อมูลเข้าด้านล่างได้' : 'Console';
+  $('stdin').disabled = $('send').disabled = $('eof').disabled = !r;
+  if (r) $('stdin').focus();
+  updateButtons();
+}
+function updateButtons() {
+  const can = canAct();
+  $('run').disabled = $('submit').disabled = !can;
+  document.querySelectorAll('.run-ex').forEach((b) => (b.disabled = !can));
+  $('run').hidden = busy.running || busy.judging;
+  $('stop').hidden = !(busy.running || busy.judging);
+}
+</script>
+</body>
+</html>

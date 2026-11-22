@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>จอผู้ชม — Code Duel</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="stage.css">
+<style>
+  .stage-main { grid-template-columns: 400px minmax(0, 1fr); }
+  .left { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); }
+  .left .board-wrap { flex: 1.3; padding: 6px 12px 8px; }
+  .left .board { font-size: 17px; }
+  .left .board td { padding: 7px 6px; }
+  .left .board .tm, .left .board th.tmh, .left .board .sb, .left .board th.sbh { display: none; }
+  .left .board .bar { min-width: 70px; }
+  .left .board .nm { max-width: 150px; }
+  .left .feed { flex: 1; border-left: 0; border-top: 1px solid var(--line); }
+  .left .feed li { font-size: 14px; padding: 7px 12px; }
+  .mode { font-size: 14px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px; }
+  .panes { display: grid; gap: 1px; background: var(--line); min-height: 0; }
+  .pane { --c: var(--p1); display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--bg); border-top: 3px solid var(--c); }
+  .pane-h { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--panel-2); }
+  .pane-h .rk { font-family: var(--mono); color: var(--muted); font-weight: 700; font-size: 18px; }
+  .pane-h .nm { font-weight: 700; font-size: 20px; color: var(--c); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pane-h .chip { font-size: 13px; border: 1px solid var(--line); border-radius: 99px; padding: 1px 9px; color: var(--muted); white-space: nowrap; }
+  .pane-h .chip.act { color: var(--ok); border-color: var(--ok); }
+  .pane-h .chip.busy { color: var(--p2); border-color: var(--p2); }
+  .pane-h .score { margin-left: auto; font-family: var(--mono); font-size: 18px; }
+  .pane-b { flex: 1; min-height: 0; position: relative; }
+  .pane-b .ed { position: absolute; inset: 0; }
+  .activity { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 8px; color: var(--muted); }
+  .activity .big { font-size: clamp(26px, 3.4vw, 52px); color: var(--text); font-weight: 700; }
+  .activity .sub { font-size: 18px; font-family: var(--mono); }
+  .activity .typing { display: inline-flex; gap: 6px; justify-content: center; }
+  .activity .typing i { width: 12px; height: 12px; border-radius: 50%; background: var(--ok); animation: blink 1s infinite; }
+  .activity .typing i:nth-child(2) { animation-delay: .15s; } .activity .typing i:nth-child(3) { animation-delay: .3s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
+  .activity[hidden] { display: none; }
+  .delay-tag { position: absolute; right: 12px; bottom: 10px; z-index: 5; font-size: 13px; color: var(--muted); background: rgba(23,32,48,.85); border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px; }
+  .no-one { display: grid; place-content: center; color: var(--muted); font-size: 20px; background: var(--bg); }
+  .keyerr { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; gap: 8px; background: var(--bg); z-index: 70; font-size: 18px; }
+  .keyerr[hidden] { display: none; }
+  @media (max-width: 900px) { .stage-main { grid-template-columns: 1fr; } .left { border-right: 0; } .panes { min-height: 70vh; } }
+</style>
+</head>
+<body>
+<header class="stage-head">
+  <div class="brand"><span class="v">Code</span> <span class="s">Duel</span></div>
+  <span class="ev" id="ev"></span>
+  <span class="rd" id="rd"></span>
+  <div class="spacer"></div>
+  <span class="mode" id="mode"></span>
+  <span class="icebadge" id="ice" hidden>🧊 แช่แข็ง</span>
+  <span class="status-pill" id="status">รอเริ่ม</span>
+  <div class="clock" id="clock">--:--</div>
+  <button class="btn ghost sound-btn" id="sound" type="button">🔇 เปิดเสียง</button>
+</header>
+
+<main class="stage-main">
+  <section class="left">
+    <div class="board-wrap">
+      <p class="frozen-note" id="frozenNote" hidden></p>
+      <table class="board">
+        <thead><tr><th>#</th><th>ชื่อ</th><th>ผ่าน</th><th style="text-align:right">คะแนน</th><th class="tmh"></th><th class="sbh"></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <aside class="feed" aria-label="ข่าวด่วน"><h2>ข่าวด่วน</h2><ul id="feed" aria-live="polite"></ul></aside>
+  </section>
+  <section class="panes" id="panes" aria-label="จอของผู้เข้าแข่งขัน"></section>
+</main>
+
+<div class="countdown" id="cd" hidden></div>
+<div class="bigbanner" id="banner" hidden></div>
+<div class="keyerr" id="keyerr" hidden><div style="font-size:42px">🔑</div><div id="keyerrText"></div><div style="color:var(--muted)">ลิงก์จอผู้ชมต้องมีคีย์ที่ผู้ดูแลสร้าง (หน้า admin → แผง "จอผู้ชม")</div></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="stage-common.js"></script>
+<script src="/vendor/monaco/vs/loader.js"></script>
+<script>
+const MONACO = location.origin + '/vendor/monaco/';
+window.MonacoEnvironment = { getWorkerUrl: () => 'data:text/javascript;charset=utf-8,' + encodeURIComponent(
+  `self.MonacoEnvironment={baseUrl:'${MONACO}'};importScripts('${MONACO}vs/base/worker/workerMain.js');`) };
+const $ = (id) => document.getElementById(id);
+const { Clock, Sound, fmtTime, feedText, feedClass, renderBoard, flashRow, countdown, banner, colorOf } = Stage;
+const socket = io();
+const key = new URLSearchParams(location.search).get('key') || '';
+let S = null;                  // สถานะทั้งหมดจากเซิร์ฟเวอร์
+const cards = {};              // slot -> ข้อมูลการ์ด (โค้ด สถานะ)
+let panes = [];                // [{ el, slot, editor }]
+let monacoReady = false;
+
+// ---------- เข้าดู ----------
+socket.on('connect', () => socket.emit('spectator:join', key, (res) => {
+  if (!res.ok) { $('keyerr').hidden = false; $('keyerrText').textContent = res.error; return; }
+  $('keyerr').hidden = true;
+  applyState(res.state, true);
+}));
+socket.on('stage:kicked', () => { $('keyerr').hidden = false; $('keyerrText').textContent = 'ผู้ดูแลเปลี่ยนคีย์ผู้ชมแล้ว — ขอลิงก์ใหม่'; });
+socket.on('stage:spectator', (st) => applyState(st));
+socket.on('stage:board', (b) => { if (!S) return; const fresh = S.match.startedAt !== b.match.startedAt; Object.assign(S, b); Clock.sync(b.match.serverNow); renderAll(); if (b.match.status === 'running' && fresh) startCountdown(); });
+socket.on('match', (m) => { Clock.sync(m.serverNow); if (S) { const fresh = S.match.startedAt !== m.startedAt; S.match = m; renderHead(); if (m.status === 'running' && fresh) startCountdown(); } });
+socket.on('stage:code', (c) => { const card = (cards[c.slot] ||= { slot: c.slot }); card.code = c; updatePaneFor(c.slot); });
+socket.on('stage:activity', (a) => {
+  const card = (cards[a.slot] ||= { slot: a.slot });
+  Object.assign(card, a, { activeAt: a.lastActive == null ? card.activeAt : Clock.now() - a.lastActive });
+  updatePaneFor(a.slot);
+});
+
+function applyState(st, initial) {
+  Clock.sync(st.match.serverNow);
+  const fresh = !S || S.match.startedAt !== st.match.startedAt;
+  S = st;
+  for (const c of st.cards) cards[c.slot] = { ...c, activeAt: c.lastActive == null ? null : Clock.now() - c.lastActive };
+  if (initial) { $('feed').replaceChildren(); [...st.feed].reverse().forEach((e) => addFeed(e, true)); }
+  renderAll();
+  if (st.match.status === 'running' && fresh) startCountdown();
+}
+function renderAll() { renderHead(); renderBoard($('rows'), S.rows, { testCount: S.testCount }); layoutPanes(); }
+
+function renderHead() {
+  const m = S.match;
+  $('ev').textContent = S.eventName;
+  $('rd').replaceChildren();
+  if (m.round) { const b = document.createElement('b'); b.textContent = `รอบที่ ${m.round}`; $('rd').append(b, S.title ? ` — ${S.title}` : ''); }
+  const st = $('status');
+  st.className = 'status-pill ' + m.status;
+  st.textContent = { waiting: 'รอเริ่ม', running: 'กำลังแข่ง', ended: S.reveal && !S.reveal.done ? 'รอประกาศผล' : 'จบรอบ' }[m.status];
+  $('ice').hidden = !S.frozen;
+  const set = S.settings || {};
+  $('mode').textContent = set.codeMode === 'live' ? '● โค้ดสด' : set.codeMode === 'delayed' ? `⏱ โค้ดหน่วง ${set.delayMin} นาที` : '🙈 ซ่อนโค้ดระหว่างแข่ง';
+  const note = $('frozenNote');
+  note.hidden = !S.frozen;
+  if (S.reveal) note.textContent = `🏆 ประกาศผล ${S.reveal.i}/${S.reveal.total}`;
+  else if (S.frozen) note.textContent = '🧊 แช่แข็ง — ผลจริงประกาศหลังจบรอบ';
+}
+setInterval(() => {
+  if (!S) return;
+  const m = S.match, c = $('clock');
+  if (m.status !== 'running') { c.textContent = m.status === 'ended' ? '00:00' : '--:--'; c.classList.remove('low'); }
+  else {
+    const left = Math.min(m.durationMin * 60000, m.startedAt + m.durationMin * 60000 - Clock.now());
+    c.textContent = fmtTime(Math.max(0, left)); c.classList.toggle('low', left < 60000);
+    const s = Math.ceil(left / 1000);
+    if (s <= 10 && s > 0 && s !== window._lastTick) { window._lastTick = s; Sound.tick(); }
+  }
+  panes.forEach((p) => p.slot && !showCode(p.slot) && renderActivity(p));   // อัปเดตเวลา "ไม่ได้พิมพ์ ..."
+}, 500);
+function startCountdown() { if (S.match.startedAt - Clock.now() > 0) countdown($('cd'), S.match.startedAt, (n) => (n > 0 ? Sound.tick() : Sound.go())); }
+
+// ---------- จอโค้ด ----------
+// Spotlight = จอเดียวเต็ม, ไม่งั้น = 4 อันดับแรก
+function chosenSlots() {
+  const sp = S.settings?.spotlight;
+  if (sp && S.rows.some((r) => r.slot === sp)) return [sp];
+  return S.rows.slice(0, 4).map((r) => r.slot);
+}
+const showCode = (slot) => !!cards[slot]?.code && cards[slot].code.code != null;
+function layoutPanes() {
+  const want = chosenSlots();
+  const box = $('panes');
+  if (!want.length) { box.className = 'panes no-one'; box.replaceChildren('รอผู้เข้าแข่งขัน'); panes.forEach((p) => p.editor?.dispose()); panes = []; return; }
+  box.className = 'panes';
+  const n = want.length;
+  box.style.gridTemplateColumns = n === 1 ? '1fr' : '1fr 1fr';
+  box.style.gridTemplateRows = n <= 2 ? '1fr' : '1fr 1fr';
+  while (panes.length > n) { const p = panes.pop(); p.editor?.dispose(); p.el.remove(); }
+  while (panes.length < n) {
+    const el = document.createElement('div'); el.className = 'pane';
+    el.innerHTML = '<div class="pane-h"><span class="rk"></span><span class="nm"></span><span class="chip lang"></span><span class="chip st"></span><span class="score"></span></div><div class="pane-b"><div class="ed"></div><div class="activity"></div><span class="delay-tag" hidden></span></div>';
+    box.appendChild(el);
+    panes.push({ el, slot: null, editor: null, shown: null });
+  }
+  want.forEach((slot, i) => { const p = panes[i]; p.slot = slot; renderPane(p); });
+}
+function updatePaneFor(slot) { panes.filter((p) => p.slot === slot).forEach(renderPane); }
+function renderPane(p) {
+  const row = S.rows.find((r) => r.slot === p.slot) || {};
+  const card = cards[p.slot] || {};
+  p.el.style.setProperty('--c', colorOf(p.slot));
+  p.el.querySelector('.rk').textContent = row.rank ? '#' + row.rank : '';
+  p.el.querySelector('.nm').textContent = row.name || card.name || '';
+  p.el.querySelector('.lang').textContent = (card.code?.lang || card.lang) === 'cpp' ? 'C++' : 'Python';
+  const st = p.el.querySelector('.st');
+  const idle = card.activeAt ? Clock.now() - card.activeAt : null;
+  const [label, cls] = card.judging ? ['📤 กำลังตรวจ', 'busy'] : card.running ? ['▶ กำลังรัน', 'busy'] : idle != null && idle < 4000 ? ['✍ กำลังพิมพ์', 'act'] : ['💭 กำลังคิด', ''];
+  st.textContent = label; st.className = 'chip st ' + cls;
+  p.el.querySelector('.score').textContent = row.total ? `${row.passed}/${row.total}${row.pending ? ' +?' : ''}` : '';
+  const ed = p.el.querySelector('.ed'), act = p.el.querySelector('.activity'), tag = p.el.querySelector('.delay-tag');
+  if (showCode(p.slot)) {
+    ed.hidden = false; act.hidden = true;
+    const c = card.code;
+    tag.hidden = !(S.settings?.codeMode === 'delayed' && S.match.status === 'running');
+    tag.textContent = c.waiting ? `โค้ดจะแสดงในอีก ${fmtTime(c.waiting * 1000)}` : `ช้ากว่าจริง ${S.settings?.delayMin} นาที`;
+    whenMonaco(() => {
+      if (!p.editor) p.editor = monaco.editor.create(ed, { value: '', language: 'python', theme: 'vs-dark', readOnly: true, automaticLayout: true, minimap: { enabled: false }, fontSize: panes.length === 1 ? 20 : 15, fontFamily: 'JetBrains Mono, Consolas, monospace', scrollBeyondLastLine: false, renderLineHighlight: 'none' });
+      p.editor.updateOptions({ fontSize: panes.length === 1 ? 20 : 15 });
+      const model = p.editor.getModel();
+      monaco.editor.setModelLanguage(model, c.lang === 'cpp' ? 'cpp' : 'python');
+      if (model.getValue() !== c.code) {
+        const atEnd = p.shown === p.slot;
+        model.setValue(c.code);
+        if (atEnd || p.shown !== p.slot) p.editor.revealLine(model.getLineCount());
+      }
+      p.shown = p.slot;
+    });
+  } else {
+    ed.hidden = true; act.hidden = false; tag.hidden = true;
+    renderActivity(p);
+  }
+}
+function renderActivity(p) {
+  const card = cards[p.slot] || {};
+  const act = p.el.querySelector('.activity');
+  const idle = card.activeAt ? Clock.now() - card.activeAt : null;
+  act.replaceChildren();
+  const big = document.createElement('div'); big.className = 'big';
+  if (card.judging) big.textContent = '📤 กำลังตรวจคำตอบ';
+  else if (card.running) big.textContent = '▶ กำลังทดสอบโค้ด';
+  else if (idle != null && idle < 4000) { big.textContent = 'กำลังพิมพ์'; const t = document.createElement('div'); t.className = 'typing'; t.append(document.createElement('i'), document.createElement('i'), document.createElement('i')); act.appendChild(t); }
+  else big.textContent = idle == null ? '💭 ยังไม่เริ่มพิมพ์' : '💭 กำลังคิด';
+  const sub = document.createElement('div'); sub.className = 'sub';
+  sub.textContent = `${card.lines ?? 0} บรรทัด` + (idle != null && idle >= 4000 ? ` · ไม่ได้พิมพ์ ${fmtTime(idle)}` : '');
+  act.prepend(big); act.appendChild(sub);
+}
+let monacoWait = [];
+function whenMonaco(fn) { monacoReady ? fn() : monacoWait.push(fn); }
+require.config({ paths: { vs: MONACO + 'vs' } });
+require(['vs/editor/editor.main'], () => { monacoReady = true; monacoWait.forEach((f) => f()); monacoWait = []; });
+
+// ---------- ข่าวด่วนและป้ายประกาศ ----------
+function addFeed(e, silent) {
+  const [ic, text] = feedText(e);
+  const li = document.createElement('li'); li.className = feedClass(e);
+  const i = document.createElement('span'); i.className = 'ic'; i.textContent = ic;
+  const t = document.createElement('span'); t.textContent = text;
+  li.append(i, t);
+  $('feed').prepend(li);
+  while ($('feed').children.length > 30) $('feed').lastChild.remove();
+  if (silent) return;
+  if (e.type === 'ac') { Sound.ok(); flashRow($('rows'), e.slot); }
+  if (e.type === 'submit') flashRow($('rows'), e.slot);
+  if (e.type === 'lead') { Sound.reveal(); flashRow($('rows'), e.slot); }
+  if (e.type === 'warn' || e.type === 'freeze') Sound.tick();
+  if (e.type === 'end') Sound.end();
+  if (e.type === 'revealed') { Sound.fanfare(); const top = S?.rows?.[0]; if (top) showBanner('gold', '🏆 ชนะเลิศ', top.name, `ผ่าน ${top.passed}/${top.total}`); }
+}
+socket.on('stage:event', (e) => addFeed(e));
+socket.on('stage:firstblood', (f) => { Sound.fanfare(); showBanner('', '🩸 FIRST BLOOD', f.name, fmtTime(f.elapsedMs)); });
+socket.on('stage:reveal', (r) => { Sound.reveal(); setTimeout(() => flashRow($('rows'), r.slot), 350); });
+function showBanner(cls, a, b, c) {
+  const el = $('banner'); el.className = 'bigbanner ' + cls;
+  const d1 = document.createElement('div'); d1.className = 't1'; d1.textContent = a;
+  const d2 = document.createElement('div'); d2.className = 't2'; d2.textContent = b;
+  const d3 = document.createElement('div'); d3.className = 't3'; d3.textContent = c;
+  banner(el, [d1, d2, d3], 4500);
+}
+$('sound').onclick = () => {
+  if (Sound.enabled) { Sound.disable(); $('sound').textContent = '🔇 เปิดเสียง'; }
+  else if (Sound.enable()) { $('sound').textContent = '🔊 เสียงเปิดอยู่'; Sound.ok(); }
+};
+</script>
+</body>
+</html>

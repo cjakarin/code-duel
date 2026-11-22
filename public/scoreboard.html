@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ตารางคะแนน — Code Duel</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="stage.css">
+</head>
+<body>
+<header class="stage-head">
+  <div class="brand"><span class="v">Code</span> <span class="s">Duel</span></div>
+  <span class="ev" id="ev"></span>
+  <span class="rd" id="rd"></span>
+  <div class="spacer"></div>
+  <span class="icebadge" id="ice" hidden>🧊 แช่แข็ง</span>
+  <span class="status-pill" id="status">รอเริ่ม</span>
+  <div class="clock" id="clock">--:--</div>
+  <button class="btn ghost sound-btn" id="sound" type="button">🔇 เปิดเสียง</button>
+</header>
+
+<main class="stage-main">
+  <section class="board-wrap" aria-label="ตารางคะแนน">
+    <p class="frozen-note" id="frozenNote" hidden></p>
+    <table class="board">
+      <thead><tr><th>#</th><th>ชื่อ</th><th>เทสเคสที่ผ่าน</th><th style="text-align:right">คะแนน</th><th class="tmh" style="text-align:right">เวลา</th><th style="text-align:right">ส่ง</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p class="empty-board" id="empty" hidden>ยังไม่มีผู้เข้าแข่งขัน</p>
+  </section>
+  <aside class="feed" aria-label="ข่าวด่วน">
+    <h2>ข่าวด่วน</h2>
+    <ul id="feed" aria-live="polite"></ul>
+  </aside>
+</main>
+
+<div class="countdown" id="cd" hidden></div>
+<div class="bigbanner" id="banner" hidden></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="stage-common.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const { Clock, Sound, fmtTime, feedText, feedClass, renderBoard, flashRow, countdown, banner } = Stage;
+const socket = io();
+let B = null;
+
+socket.on('connect', () => socket.emit('scoreboard:join', (res) => { if (res.ok) applyBoard(res.board, true); }));
+socket.on('stage:board', (b) => applyBoard(b));
+socket.on('match', (m) => { Clock.sync(m.serverNow); if (B) { const fresh = !B.match || B.match.startedAt !== m.startedAt; B.match = m; renderHead(); if (m.status === 'running' && fresh) startCountdown(); } });
+
+function applyBoard(b, initial) {
+  Clock.sync(b.match.serverNow);
+  const fresh = !B || B.match.startedAt !== b.match.startedAt;
+  B = b;
+  renderHead();
+  renderBoard($('rows'), b.rows, { testCount: b.testCount });
+  $('empty').hidden = b.rows.length > 0;
+  if (initial) { $('feed').replaceChildren(); [...b.feed].reverse().forEach((e) => addFeed(e, true)); }
+  if (b.match.status === 'running' && fresh) startCountdown();
+}
+function renderHead() {
+  const m = B.match;
+  $('ev').textContent = B.eventName;
+  $('rd').replaceChildren();
+  if (m.round) { const b = document.createElement('b'); b.textContent = `รอบที่ ${m.round}`; $('rd').append(b, B.title ? ` — ${B.title}` : ''); }
+  const st = $('status');
+  st.className = 'status-pill ' + m.status;
+  st.textContent = { waiting: 'รอเริ่ม', running: 'กำลังแข่ง', ended: B.reveal && !B.reveal.done ? 'รอประกาศผล' : 'จบรอบ' }[m.status];
+  $('ice').hidden = !B.frozen;
+  const note = $('frozenNote');
+  note.hidden = !B.frozen;
+  if (B.reveal) note.textContent = `🏆 กำลังประกาศผล — เปิดแล้ว ${B.reveal.i} จาก ${B.reveal.total} คน (จากอันดับล่างขึ้นบน)`;
+  else if (B.frozen) note.textContent = '🧊 ตารางคะแนนถูกแช่แข็ง — การส่งหลังจากนี้แสดงเป็น +N? ผลจริงจะประกาศหลังจบรอบ';
+  document.title = `ตารางคะแนน ${B.eventName} — Code Duel`;
+}
+setInterval(() => {
+  if (!B) return;
+  const m = B.match, c = $('clock');
+  if (m.status !== 'running') { c.textContent = m.status === 'ended' ? '00:00' : '--:--'; c.classList.remove('low'); return; }
+  const left = Math.min(m.durationMin * 60000, m.startedAt + m.durationMin * 60000 - Clock.now());
+  c.textContent = fmtTime(Math.max(0, left));
+  c.classList.toggle('low', left < 60000);
+  const s = Math.ceil(left / 1000);
+  if (s <= 10 && s > 0 && s !== window._lastTick) { window._lastTick = s; Sound.tick(); }
+}, 200);
+
+function startCountdown() {
+  if (B.match.startedAt - Clock.now() > 0) countdown($('cd'), B.match.startedAt, (n) => (n > 0 ? Sound.tick() : Sound.go()));
+}
+
+// ---------- ข่าวด่วน ----------
+function addFeed(e, silent) {
+  const [ic, text] = feedText(e);
+  const li = document.createElement('li'); li.className = feedClass(e);
+  const i = document.createElement('span'); i.className = 'ic'; i.textContent = ic;
+  const t = document.createElement('span'); t.textContent = text;
+  const tm = document.createElement('span'); tm.className = 'ft';
+  tm.textContent = new Date(e.at - 0).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  li.append(i, t, tm);
+  $('feed').prepend(li);
+  while ($('feed').children.length > 40) $('feed').lastChild.remove();
+  if (silent) return;
+  if (e.type === 'ac') { Sound.ok(); flashRow($('rows'), e.slot); }
+  if (e.type === 'submit') flashRow($('rows'), e.slot);
+  if (e.type === 'lead') { Sound.reveal(); flashRow($('rows'), e.slot); }
+  if (e.type === 'warn' || e.type === 'freeze') Sound.tick();
+  if (e.type === 'end') Sound.end();
+  if (e.type === 'revealed') { Sound.fanfare(); const top = B?.rows?.[0]; if (top) showBanner('gold', '🏆 ชนะเลิศ', top.name, `ผ่าน ${top.passed}/${top.total}`); }
+}
+socket.on('stage:event', (e) => addFeed(e));
+socket.on('stage:firstblood', (f) => { Sound.fanfare(); showBanner('', '🩸 FIRST BLOOD', f.name, fmtTime(f.elapsedMs)); });
+socket.on('stage:reveal', (r) => { Sound.reveal(); setTimeout(() => flashRow($('rows'), r.slot), 350); });
+
+function showBanner(cls, a, b, c) {
+  const el = $('banner');
+  el.className = 'bigbanner ' + cls;
+  const d1 = document.createElement('div'); d1.className = 't1'; d1.textContent = a;
+  const d2 = document.createElement('div'); d2.className = 't2'; d2.textContent = b;
+  const d3 = document.createElement('div'); d3.className = 't3'; d3.textContent = c;
+  banner(el, [d1, d2, d3], 4500);
+}
+
+$('sound').onclick = () => {
+  if (Sound.enabled) { Sound.disable(); $('sound').textContent = '🔇 เปิดเสียง'; }
+  else if (Sound.enable()) { $('sound').textContent = '🔊 เสียงเปิดอยู่'; Sound.ok(); }
+};
+</script>
+</body>
+</html>

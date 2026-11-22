@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สรุปผล — Code Duel</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="style.css">
+<style>
+  html, body { height: auto; min-height: 100%; }
+  .topbar { position: sticky; top: 0; z-index: 10; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 20px 60px; display: grid; gap: 28px; }
+  h1 { margin: 0; font-size: 26px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  h1 input { font: inherit; font-size: 24px; font-weight: 700; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 2px 8px; min-width: 0; flex: 1; }
+  h1 input:hover, h1 input:focus { border-color: var(--line); background: var(--panel-2); }
+  h2 { margin: 0 0 10px; font-size: 19px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  h2 .sub { font-size: 14px; color: var(--muted); font-weight: 400; }
+  .meta { color: var(--muted); font-size: 14px; margin: -4px 0 10px; }
+  .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.num, th.num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  tr.top1 td:first-child { color: var(--p1); font-weight: 700; }
+  .rank { font-family: var(--mono); font-weight: 600; }
+  .full { color: var(--ok); }
+  details.code summary { cursor: pointer; color: var(--p2); font-size: 13px; }
+  details.code pre { margin: 6px 0 0; max-height: 360px; overflow: auto; background: #121a27; border: 1px solid var(--line); border-radius: 6px; padding: 10px; font: 13px/1.5 var(--mono); white-space: pre; }
+  .empty { color: var(--muted); }
+  .paste-warn { color: var(--p1); }
+  a.replay { color: var(--p2); font-size: 13px; text-decoration: none; white-space: nowrap; }
+  a.replay:hover { text-decoration: underline; }
+  .sim { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .sim-note { color: var(--muted); font-size: 13px; margin: 4px 0 8px; }
+  .sim .bar { display: inline-block; height: 8px; border-radius: 4px; background: var(--line); width: 90px; vertical-align: middle; margin-right: 6px; position: relative; overflow: hidden; }
+  .sim .bar i { position: absolute; inset: 0 auto 0 0; background: var(--muted); }
+  .sim tr.high td { background: rgba(255, 122, 122, .10); }
+  .sim tr.high .bar i { background: var(--bad); }
+  .sim tr.mid .bar i { background: var(--p1); }
+  .diff-overlay { position: fixed; inset: 0; z-index: 50; background: rgba(10, 15, 25, .85); display: flex; flex-direction: column; padding: 16px; gap: 8px; }
+  .diff-overlay[hidden] { display: none; }
+  .diff-head { display: flex; gap: 10px; align-items: center; color: var(--text); flex-wrap: wrap; }
+  .diff-head .l, .diff-head .r { flex: 1; font-weight: 600; }
+  #diffBox { flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .live { color: var(--ok); border: 1px solid var(--ok); border-radius: 99px; padding: 0 8px; font-size: 13px; }
+  /* โหมดนำเสนอ: ตัวใหญ่ ซ่อนโค้ดและปุ่ม สำหรับฉายขึ้นจอ */
+  body.present main { max-width: 1400px; }
+  body.present table { font-size: 22px; }
+  body.present h2 { font-size: 28px; }
+  body.present .code-col, body.present .admin-only { display: none; }
+  @media print {
+    body { background: #fff; color: #000; }
+    .topbar, .admin-only, .code-col { display: none !important; }
+    .card { border: 1px solid #999; break-inside: avoid; background: #fff; }
+    th, td { border-color: #bbb; color: #000; }
+    h1 input { color: #000; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="v">Code</span> <span class="s">Duel</span> <span style="color:var(--muted)">สรุปผล</span></div>
+  <div class="spacer"></div>
+  <div class="tools">
+    <label class="btn small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="present"> โหมดนำเสนอ</label>
+    <button class="btn small" id="csvOverall">CSV ผลรวม</button>
+    <button class="btn small" id="csvDetail">CSV รายละเอียด</button>
+    <button class="btn small" id="print">พิมพ์ / PDF</button>
+    <button class="btn small stop" id="newEvent">เริ่มงานแข่งใหม่</button>
+  </div>
+</header>
+
+<main>
+  <h1><input type="text" id="eventName" maxlength="100" aria-label="ชื่องานแข่ง"></h1>
+  <section class="card" aria-labelledby="overallTitle">
+    <h2 id="overallTitle">อันดับรวมทุกรอบ <span class="sub">คะแนนรอบละ 100 = ผ่านเทสเคสครบทุกชุด, เท่ากันดูเวลารวมที่น้อยกว่า</span></h2>
+    <div class="table-wrap"><table id="overall"></table></div>
+  </section>
+  <div id="rounds" style="display:grid;gap:28px"></div>
+</main>
+
+<div class="diff-overlay" id="diffOverlay" hidden role="dialog" aria-label="เทียบโค้ด">
+  <div class="diff-head">
+    <span class="l" id="diffL"></span><a class="replay" id="diffReplayL" target="_blank">▶ Replay</a>
+    <span class="r" id="diffR"></span><a class="replay" id="diffReplayR" target="_blank">▶ Replay</a>
+    <button class="btn" id="diffClose">ปิด (Esc)</button>
+  </div>
+  <div id="diffBox"></div>
+</div>
+
+<div class="overlay" id="loginOverlay">
+  <form class="dialog" id="loginForm">
+    <h2>เข้าสู่ระบบผู้ดูแล</h2>
+    <label>รหัสผ่าน <input type="password" id="pw" required autofocus></label>
+    <p class="error" id="loginErr"></p>
+    <button class="btn go" type="submit">เข้าสู่ระบบ</button>
+  </form>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const socket = io();
+let data = null;
+
+const fmtTime = (ms) => {
+  if (ms == null) return '-';
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+const fmtDate = (ms) => ms ? new Date(ms).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+const langName = (l) => (l === 'cpp' ? 'C++' : 'Python');
+function el(tag, text, cls) { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
+function headRow(table, cols) {
+  const tr = table.createTHead().insertRow();
+  for (const [t, cls] of cols) tr.appendChild(el('th', t, cls || ''));
+}
+
+// ---------- login ----------
+function login(pw) {
+  socket.emit('admin:login', pw, (res) => {
+    if (!res.ok) { $('loginErr').textContent = res.error; sessionStorage.removeItem('duel-admin'); $('loginOverlay').hidden = false; return; }
+    sessionStorage.setItem('duel-admin', pw);
+    $('loginOverlay').hidden = true;
+    load();
+  });
+}
+$('loginForm').onsubmit = (e) => { e.preventDefault(); login($('pw').value); };
+socket.on('connect', () => { const pw = sessionStorage.getItem('duel-admin'); if (pw) login(pw); });
+socket.on('results:changed', () => load());
+
+function load() { socket.emit('results:get', (r) => { data = r; render(); }); }
+
+// ---------- แสดงผล ----------
+function render() {
+  if (document.activeElement !== $('eventName')) $('eventName').value = data.eventName;
+  document.title = `สรุปผล ${data.eventName} — Code Duel`;
+
+  // อันดับรวม
+  const t = $('overall'); t.replaceChildren();
+  const ov = data.overall;
+  if (!ov.rows.length) {
+    t.appendChild(el('caption', 'ยังไม่มีรอบที่แข่งจบ', 'empty'));
+  } else {
+    headRow(t, [['อันดับ'], ['ชื่อ'], ...ov.rounds.map((r) => [`รอบ ${r.no}`, 'num']), ['รวม', 'num'], ['ผ่านครบ', 'num'], ['เวลารวม', 'num']]);
+    const body = t.createTBody();
+    for (const r of ov.rows) {
+      const tr = body.insertRow(); if (r.rank === 1) tr.className = 'top1';
+      tr.appendChild(el('td', r.rank, 'rank'));
+      tr.appendChild(el('td', r.name));
+      for (const rd of ov.rounds) tr.appendChild(el('td', r.rounds[rd.no] ?? '-', 'num'));
+      tr.appendChild(el('td', r.points, 'num'));
+      tr.appendChild(el('td', `${r.solved} รอบ`, 'num'));
+      tr.appendChild(el('td', fmtTime(r.timeMs), 'num'));
+    }
+  }
+
+  // แต่ละรอบ (ล่าสุดก่อน)
+  const box = $('rounds'); box.replaceChildren();
+  for (const round of [...data.rounds].reverse()) {
+    const sec = el('section', null, 'card');
+    const h = el('h2', `รอบที่ ${round.no}`);
+    h.appendChild(el('span', round.title, 'sub'));
+    if (!round.results) h.appendChild(el('span', 'กำลังแข่ง', 'live'));
+    const spacer = el('span'); spacer.style.flex = '1'; h.appendChild(spacer);
+    const del = el('button', 'ลบรอบนี้', 'btn small ghost admin-only');
+    del.onclick = () => {
+      if (!confirm(`ลบผลรอบที่ ${round.no} (${round.title})? ใช้กับรอบทดสอบหรือรอบที่ต้องแข่งใหม่ กู้คืนไม่ได้`)) return;
+      socket.emit('admin:round:delete', round.no, (res) => { if (!res.ok) alert(res.error); });
+    };
+    h.appendChild(del);
+    sec.appendChild(h);
+    sec.appendChild(el('p', `เริ่ม ${fmtDate(round.startedAt)} — จบ ${fmtDate(round.endedAt)} · เวลา ${round.durationMin} นาที · เทสเคสลับ ${round.testCount} ชุด`, 'meta'));
+
+    if (!round.results) {
+      sec.appendChild(el('p', 'ผลจะแสดงเมื่อจบรอบ', 'empty'));
+    } else {
+      const wrap = el('div', null, 'table-wrap');
+      const tb = el('table');
+      headRow(tb, [['อันดับ'], ['ชื่อ'], ['ผ่าน', 'num'], ['คะแนน', 'num'], ['เวลา', 'num'], ['ส่ง', 'num'], ['ภาษา'], ['วางโค้ด', 'num code-col'], ['โค้ดสุดท้าย', 'code-col'], ['', 'code-col']]);
+      const body = tb.createTBody();
+      for (const r of round.results) {
+        const tr = body.insertRow(); if (r.rank === 1 && r.passed > 0) tr.className = 'top1';
+        tr.appendChild(el('td', r.rank, 'rank'));
+        tr.appendChild(el('td', r.name));
+        tr.appendChild(el('td', `${r.passed}/${r.total}`, 'num' + (r.total && r.passed === r.total ? ' full' : '')));
+        tr.appendChild(el('td', r.points, 'num'));
+        tr.appendChild(el('td', fmtTime(r.timeMs), 'num'));
+        tr.appendChild(el('td', r.submissions, 'num'));
+        tr.appendChild(el('td', langName(r.lang)));
+        tr.appendChild(el('td', r.pastes ? `${r.pastes} ครั้ง` : '-', 'num code-col' + (r.pastes ? ' paste-warn' : '')));
+        const codeTd = el('td', null, 'code-col');
+        const d = el('details', null, 'code');
+        d.appendChild(el('summary', 'ดูโค้ด'));
+        d.appendChild(el('pre', r.code || ''));
+        codeTd.appendChild(d);
+        tr.appendChild(codeTd);
+        const rp = el('td', null, 'code-col');
+        const a = el('a', '▶ Replay', 'replay');
+        a.href = `replay.html?round=${round.no}&slot=${r.slot}`; a.target = '_blank';
+        a.title = 'ย้อนดูการพิมพ์โค้ดตลอดรอบ';
+        rp.appendChild(a); tr.appendChild(rp);
+      }
+      wrap.appendChild(tb); sec.appendChild(wrap);
+      sec.appendChild(similarityBlock(round));
+    }
+    box.appendChild(sec);
+  }
+}
+
+// ---------- ตรวจความคล้าย ----------
+const simCache = {};
+function similarityBlock(round) {
+  const box = el('div', null, 'sim admin-only');
+  const btn = el('button', '🔍 ตรวจความคล้ายของโค้ด', 'btn small');
+  const out = el('div');
+  btn.onclick = () => {
+    btn.disabled = true; btn.textContent = 'กำลังตรวจ ...';
+    socket.emit('similarity:get', round.no, (res) => {
+      btn.disabled = false; btn.textContent = '🔍 ตรวจความคล้ายของโค้ด';
+      if (!res.ok) { out.replaceChildren(el('p', res.error, 'empty')); return; }
+      simCache[round.no] = res.pairs;
+      renderSim(out, round, res.pairs);
+    });
+  };
+  box.append(btn, out);
+  if (simCache[round.no]) renderSim(out, round, simCache[round.no]);
+  return box;
+}
+function renderSim(out, round, pairs) {
+  out.replaceChildren();
+  out.appendChild(el('p', 'เทียบโค้ดสุดท้ายทุกคู่ที่ใช้ภาษาเดียวกัน (ไม่นับคอมเมนต์และโค้ดแม่แบบ) · "โครงสร้าง" ไม่สนชื่อตัวแปร จึงจับการเปลี่ยนชื่อเพื่อเลี่ยงได้ · ค่าสูงไม่ได้แปลว่าลอกเสมอ โจทย์ง่ายมักเขียนออกมาคล้ายกัน ให้ดูประกอบกับ Replay และจำนวนครั้งที่วางโค้ด', 'sim-note'));
+  if (!pairs.length) { out.appendChild(el('p', 'ไม่มีคู่ที่เทียบได้ (ต้องใช้ภาษาเดียวกันและโค้ดยาวพอ)', 'empty')); return; }
+  const wrap = el('div', null, 'table-wrap');
+  const t = el('table');
+  headRow(t, [['คู่'], ['ภาษา'], ['โครงสร้างเหมือน'], ['เหมือนตรงตัว', 'num'], ['']]);
+  const body = t.createTBody();
+  for (const p of pairs.slice(0, 30)) {
+    const tr = body.insertRow();
+    tr.className = p.shape >= 80 ? 'high' : p.shape >= 50 ? 'mid' : '';
+    tr.appendChild(el('td', `${p.a.name} ↔ ${p.b.name}`));
+    tr.appendChild(el('td', langName(p.lang)));
+    const sc = el('td'); const bar = el('span', null, 'bar'); const fill = el('i'); fill.style.width = p.shape + '%';
+    bar.appendChild(fill); sc.append(bar, `${p.shape}%`); tr.appendChild(sc);
+    tr.appendChild(el('td', `${p.exact}%`, 'num'));
+    const act = el('td'); const b = el('button', 'เทียบโค้ด', 'btn small');
+    b.onclick = () => openDiff(round, p.a.slot, p.b.slot);
+    act.appendChild(b); tr.appendChild(act);
+  }
+  wrap.appendChild(t); out.appendChild(wrap);
+  if (pairs.length > 30) out.appendChild(el('p', `แสดง 30 คู่แรกจาก ${pairs.length} คู่`, 'sim-note'));
+}
+
+// เทียบโค้ดสองคนแบบเคียงข้าง (โหลดตัวเขียนโค้ดเมื่อใช้ครั้งแรก)
+let monacoLoading = null, diffEditor = null;
+function loadMonaco() {
+  if (monacoLoading) return monacoLoading;
+  monacoLoading = new Promise((resolve) => {
+    const base = location.origin + '/vendor/monaco/';
+    window.MonacoEnvironment = { getWorkerUrl: () => 'data:text/javascript;charset=utf-8,' + encodeURIComponent(
+      `self.MonacoEnvironment={baseUrl:'${base}'};importScripts('${base}vs/base/worker/workerMain.js');`) };
+    const sc = document.createElement('script'); sc.src = base + 'vs/loader.js';
+    sc.onload = () => { require.config({ paths: { vs: base + 'vs' } }); require(['vs/editor/editor.main'], () => resolve()); };
+    document.head.appendChild(sc);
+  });
+  return monacoLoading;
+}
+async function openDiff(round, sa, sb) {
+  const A = round.results.find((r) => r.slot === sa), B = round.results.find((r) => r.slot === sb);
+  $('diffL').textContent = A.name; $('diffR').textContent = B.name;
+  $('diffOverlay').hidden = false;
+  await loadMonaco();
+  diffEditor?.dispose();
+  const lang = A.lang === 'cpp' ? 'cpp' : 'python';
+  diffEditor = monaco.editor.createDiffEditor($('diffBox'), { readOnly: true, theme: 'vs-dark', automaticLayout: true, renderSideBySide: true, fontSize: 14, fontFamily: 'JetBrains Mono, Consolas, monospace' });
+  diffEditor.setModel({ original: monaco.editor.createModel(A.code || '', lang), modified: monaco.editor.createModel(B.code || '', lang) });
+  $('diffReplayL').href = `replay.html?round=${round.no}&slot=${sa}`;
+  $('diffReplayR').href = `replay.html?round=${round.no}&slot=${sb}`;
+  $('diffClose').focus();
+}
+function closeDiff() { $('diffOverlay').hidden = true; diffEditor?.dispose(); diffEditor = null; }
+
+// ---------- เครื่องมือ ----------
+$('eventName').addEventListener('change', () => socket.emit('admin:event:rename', $('eventName').value));
+$('present').onchange = (e) => document.body.classList.toggle('present', e.target.checked);
+$('print').onclick = () => window.print();
+$('diffClose').onclick = closeDiff;
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('diffOverlay').hidden) closeDiff(); });
+
+function downloadCsv(filename, rows) {
+  const esc = (v) => `"${String(v ?? '').replaceAll('"', '""')}"`;
+  const csv = '\ufeff' + rows.map((r) => r.map(esc).join(',')).join('\r\n'); // BOM ให้ Excel อ่านภาษาไทยถูก
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+const safeName = () => data.eventName.replace(/[\\/:*?"<>|]+/g, '').slice(0, 60) || 'code-duel';
+$('csvOverall').onclick = () => {
+  if (!data) return;
+  const ov = data.overall;
+  downloadCsv(`${safeName()}-ผลรวม.csv`, [
+    ['อันดับ', 'ชื่อ', ...ov.rounds.map((r) => `รอบ ${r.no}: ${r.title}`), 'คะแนนรวม', 'รอบที่ผ่านครบ', 'เวลารวม (วินาที)'],
+    ...ov.rows.map((r) => [r.rank, r.name, ...ov.rounds.map((rd) => r.rounds[rd.no] ?? ''), r.points, r.solved, Math.round(r.timeMs / 1000)]),
+  ]);
+};
+$('csvDetail').onclick = () => {
+  if (!data) return;
+  const rows = [['รอบ', 'โจทย์', 'อันดับ', 'ลำดับผู้เข้าแข่งขัน', 'ชื่อ', 'ผ่าน', 'เทสเคสทั้งหมด', 'คะแนน', 'เวลา (วินาที)', 'จำนวนครั้งที่ส่ง', 'ภาษา']];
+  for (const rd of data.rounds) for (const r of rd.results || []) {
+    rows.push([rd.no, rd.title, r.rank, r.slot, r.name, r.passed, r.total, r.points, r.timeMs == null ? '' : Math.round(r.timeMs / 1000), r.submissions, langName(r.lang)]);
+  }
+  downloadCsv(`${safeName()}-รายละเอียด.csv`, rows);
+};
+$('newEvent').onclick = () => {
+  const name = prompt('ชื่องานแข่งใหม่ (งานปัจจุบันจะถูกเก็บไว้ในโฟลเดอร์ data/events)', 'การแข่งขัน');
+  if (name === null) return;
+  const keepRoster = confirm('ใช้รายชื่อและรหัสเข้าใช้ชุดเดิมต่อไหม?\n\nตกลง = ใช้ชุดเดิม\nยกเลิก = สร้างรหัสใหม่ทั้งหมด');
+  socket.emit('admin:event:new', { name, keepRoster }, (res) => { if (!res.ok) alert(res.error); });
+};
+</script>
+</body>
+</html>

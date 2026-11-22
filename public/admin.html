@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code Duel — ผู้ดูแล</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" media="print" onload="this.media='all'"><!-- ฟอนต์จากอินเทอร์เน็ต ถ้าไม่มีเน็ตจะใช้ฟอนต์ของเครื่องแทน -->
+<link rel="stylesheet" href="/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="style.css">
+<style>
+  /* หน้า admin เลื่อนขึ้นลงได้ทั้งหน้า แถบควบคุมด้านบนติดอยู่เสมอ */
+  html, body { height: auto; min-height: 100%; }
+  body { display: block; }
+  .topbar { position: sticky; top: 0; z-index: 30; }
+  .jump { position: fixed; right: 16px; bottom: 16px; z-index: 30; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+  .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .controls input { width: 70px; }
+  .muted { color: var(--muted); font-size: 14px; }
+
+  details.setter { border-bottom: 1px solid var(--line); background: var(--panel); }
+  details.setter summary { padding: 8px 16px; cursor: pointer; font-weight: 600; }
+  .setter-body { padding: 0 16px 14px; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 14px; }
+  .setter-main { display: grid; gap: 8px; min-width: 0; align-content: start; }
+  .bank { display: flex; flex-direction: column; gap: 6px; min-height: 0; max-height: calc(52vh + 76px); }
+  .bank-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .bank-head b { font-weight: 600; }
+  .bank-actions { display: flex; gap: 6px; }
+  .bank-actions > * { flex: 1; text-align: center; }
+  .bank-list { list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); }
+  .bank-list li { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
+  .bank-list li:last-child { border-bottom: 0; }
+  .bank-list li.editing { background: #24324a; box-shadow: inset 3px 0 0 var(--p2); }
+  .bank-item { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 7px 10px; cursor: pointer; }
+  .bank-item:hover { background: #22304a; }
+  .bank-item .t { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bank-item .meta { display: block; font-size: 12px; color: var(--muted); }
+  .bank-item .live { font-size: 11px; color: var(--ok); border: 1px solid var(--ok); border-radius: 99px; padding: 0 6px; margin-left: 4px; }
+  .bank-del { background: none; border: 0; color: var(--muted); padding: 0 10px; cursor: pointer; font-size: 13px; }
+  .bank-del:hover { color: var(--bad); }
+  .bank-empty { padding: 12px; color: var(--muted); font-size: 14px; }
+  .editing-label { font-size: 14px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .editing-label b { color: var(--text); font-weight: 600; }
+  .saved-state { font-size: 13px; }
+  .saved-state.unsaved { color: var(--p1); }
+  .saved-state.ok { color: var(--ok); }
+  .setter-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .setter-split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; height: 52vh; min-height: 300px; }
+  .setter-split textarea { height: 100%; resize: none; font-size: 13px; line-height: 1.5; }
+  .preview { overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 16px 20px; }
+  .summary-line { font-size: 14px; color: var(--muted); }
+  .summary-line b { color: var(--text); font-weight: 600; }
+  .dirty { color: var(--p1); font-size: 14px; }
+  .arena { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: var(--row-h, max(420px, calc(100vh - 60px))); gap: 1px; background: var(--line); scroll-margin-top: 56px; }
+  .card { --c: var(--p1); background: var(--bg); display: flex; flex-direction: column; min-width: 0; min-height: 0; border-top: 3px solid var(--c); }
+  .card-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--panel-2); flex-wrap: wrap; }
+  .seat { color: var(--c); font-weight: 700; }
+  .pname { font-weight: 600; font-size: 17px; }
+  .tag { font-size: 12px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+  .tag.live { color: var(--ok); border-color: var(--ok); }
+  .tag.off { color: var(--bad); border-color: var(--bad); }
+  .tag.lang { color: var(--c); border-color: var(--c); }
+  .tag.score { font-family: var(--mono); }
+  .tag.score.full { color: var(--ok); border-color: var(--ok); }
+  .tag.win { color: var(--p1); border-color: var(--p1); font-weight: 600; }
+  .ed { flex: 1; min-height: 180px; }
+  /* รายชื่อผู้เข้าแข่งขันและรหัสเข้าใช้ */
+  details.roster { border-bottom: 1px solid var(--line); background: var(--panel); }
+  details.roster summary { padding: 8px 16px; cursor: pointer; font-weight: 600; }
+  .roster-body { padding: 0 16px 14px; display: grid; gap: 8px; }
+  .roster-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+  .roster-wrap { overflow: auto; max-height: 50vh; border: 1px solid var(--line); border-radius: 6px; }
+  .roster-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .roster-table th { position: sticky; top: 0; background: var(--panel-2); text-align: left; font-weight: 500; color: var(--muted); padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  .roster-table td { padding: 4px 10px; border-bottom: 1px solid var(--line); }
+  .roster-table input { width: 100%; min-width: 160px; padding: 3px 8px; }
+  .roster-table .acode { font-family: var(--mono); font-size: 15px; letter-spacing: 1px; white-space: nowrap; }
+  .roster-table .on { color: var(--ok); } .roster-table .off { color: var(--muted); }
+  .tag.acode-tag { font-family: var(--mono); }
+  .round-pill { font-size: 13px; color: var(--text); border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px; white-space: nowrap; }
+  a.btn { text-decoration: none; display: inline-block; }
+  .stage-links { display: grid; gap: 6px; }
+  .link-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+  .link-row b { min-width: 120px; }
+  .link-row code { font-family: var(--mono); background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 2px 8px; user-select: all; word-break: break-all; }
+  .stage-settings { display: flex; gap: 10px 22px; flex-wrap: wrap; align-items: center; font-size: 14px; color: var(--muted); }
+  .stage-settings label { display: flex; gap: 6px; align-items: center; }
+  .stage-settings input[type=number] { width: 64px; }
+  .stage-settings label[hidden] { display: none; }
+  .reveal-box { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--p1); background: #2b2a1a; color: var(--p1); font-weight: 600; }
+  .reveal-box[hidden] { display: none; }
+  .tag.spot { color: var(--p1); border-color: var(--p1); }
+  .card .console { height: 30%; min-height: 110px; border-top: 1px solid var(--line); }
+  .card .console:empty::before { content: 'ยังไม่มีผลลัพธ์'; }
+
+  .card.full { position: fixed; inset: 0; z-index: 40; }
+  .vis { font-size: 13px; padding: 2px 10px; border-radius: 99px; border: 1px solid var(--line); white-space: nowrap; }
+  .vis.hidden-p { color: var(--muted); }
+  .vis.shown { color: var(--p1); border-color: var(--p1); }
+  .lan { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 5px 16px; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+  .lan code { font-family: var(--mono); color: var(--text); font-size: 14px; user-select: all; }
+  .board { display: flex; gap: 6px; align-items: center; padding: 6px 16px; border-bottom: 1px solid var(--line); background: var(--panel-2); overflow-x: auto; font-size: 14px; }
+  .board .lbl { color: var(--muted); white-space: nowrap; }
+  .chip { display: flex; gap: 6px; align-items: center; white-space: nowrap; border: 1px solid var(--line); border-radius: 99px; padding: 1px 10px; }
+  .chip .rk { color: var(--muted); font-family: var(--mono); }
+  .chip .sw { width: 8px; height: 8px; border-radius: 50%; }
+  .chip .pts { font-family: var(--mono); }
+  .chip.full .pts { color: var(--ok); }
+  .card.full .pname { font-size: 22px; }
+  .card.full .console { font-size: 16px; }
+
+  @media (max-width: 900px) {
+    .arena { grid-template-columns: 1fr !important; }
+    .arena { --row-h: 80vh !important; }
+    .setter-body { grid-template-columns: 1fr; }
+    .bank { max-height: 40vh; }
+    .setter-split { grid-template-columns: 1fr; height: auto; }
+    .setter-split textarea { height: 45vh; }
+    .preview { max-height: 50vh; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="v">Code</span> <span class="s">Duel</span> <span class="muted">ผู้ดูแล</span></div>
+  <div class="controls">
+    <form id="seatForm" class="controls" style="gap:6px">
+      <label class="muted">ผู้เข้าแข่งขัน <input type="number" id="seatCount" min="1" max="40" value="2"> คน</label>
+      <button class="btn small" type="submit" title="เพิ่มจำนวน = สร้างรหัสเข้าใช้ให้คนที่เพิ่มมา">ปรับ</button>
+    </form>
+    <label class="muted">เวลา <input type="number" id="dur" min="1" max="600" value="30"> นาที</label>
+    <button class="btn go" id="start">เริ่มรอบที่ 1</button>
+    <button class="btn stop" id="end">จบรอบ</button>
+    <button class="btn" id="reset" title="ซ่อนโจทย์ ล้างโค้ดและ console ของผู้เข้าแข่งขันทุกคน">เตรียมรอบถัดไป</button>
+    <a class="btn" href="results.html" target="_blank" id="resultsLink">📊 สรุปผล</a>
+  </div>
+  <div class="spacer"></div>
+  <span class="round-pill" id="roundPill" hidden></span>
+  <span class="vis" id="exec" hidden></span>
+  <span class="vis" id="vis" title="ผู้เล่นมองเห็นโจทย์หรือไม่"></span>
+  <span class="status-pill" id="status">รอเริ่ม</span>
+  <div class="clock" id="clock">--:--</div>
+</header>
+
+<div class="winner-bar" id="winnerBar" hidden></div>
+<div class="lan" id="lan" hidden></div>
+<div class="board" id="board" hidden><span class="lbl">อันดับ</span></div>
+<details class="roster" id="rosterPanel">
+  <summary>ผู้เข้าแข่งขันและรหัสเข้าใช้ (<span id="rosterSummary">-</span>)</summary>
+  <div class="roster-body">
+    <div class="roster-tools">
+      <span>แจกรหัสให้แต่ละคน ผู้เข้าแข่งขันใช้รหัสนี้เข้าหน้า player · ตั้งชื่อไว้ก่อนได้ ถ้าเว้นว่าง ผู้เข้าแข่งขันจะกรอกชื่อเองตอนเข้าครั้งแรก</span>
+      <div class="spacer"></div>
+      <button class="btn small" type="button" id="printCards">🖨 พิมพ์บัตรรหัส</button>
+      <button class="btn small" type="button" id="rosterCsv">ดาวน์โหลด CSV</button>
+    </div>
+    <div class="roster-wrap">
+      <table class="roster-table">
+        <thead><tr><th>ลำดับ</th><th>ชื่อ</th><th>รหัสเข้าใช้</th><th>สถานะ</th><th></th></tr></thead>
+        <tbody id="rosterBody"></tbody>
+      </table>
+    </div>
+  </div>
+</details>
+<details class="roster" id="stagePanel">
+  <summary>จอผู้ชม (<span id="stageSummary">-</span>)</summary>
+  <div class="roster-body">
+    <div class="stage-links">
+      <div class="link-row"><b>📊 ตารางคะแนน</b><span class="muted">เปิดได้ทุกคน ไม่มีโค้ด เหมาะกับจอหน้าห้องและมือถือผู้ชม</span><code id="sbUrl"></code>
+        <button class="btn small" type="button" data-copy="sbUrl">คัดลอก</button><a class="btn small" id="sbOpen" target="_blank">เปิด</a></div>
+      <div class="link-row"><b>🎥 จอผู้ชม</b><span class="muted">มีจอโค้ด ต้องใช้ลิงก์นี้ (มีคีย์) อย่าแจกให้ผู้เข้าแข่งขัน</span><code id="spUrl"></code>
+        <button class="btn small" type="button" data-copy="spUrl">คัดลอก</button><a class="btn small" id="spOpen" target="_blank">เปิด</a>
+        <button class="btn small ghost" type="button" id="rotateKey" title="ลิงก์เดิมใช้ไม่ได้ทันที">สร้างคีย์ใหม่</button></div>
+    </div>
+    <div class="stage-settings">
+      <label>โค้ดบนจอผู้ชม
+        <select id="codeMode">
+          <option value="hidden">ซ่อนระหว่างแข่ง (จอฉายอยู่ห้องเดียวกับผู้แข่ง)</option>
+          <option value="delayed">หน่วงเวลา</option>
+          <option value="live">สด (ผู้ชมอยู่คนละห้อง / ถ่ายทอดสด)</option>
+        </select>
+      </label>
+      <label id="delayRow">หน่วง <input type="number" id="delayMin" min="1" max="60" value="5"> นาที</label>
+      <label>แช่แข็งตาราง <input type="number" id="freezeMin" min="0" max="120" value="10"> นาทีสุดท้าย <span class="muted">(0 = ไม่แช่แข็ง)</span></label>
+      <label><input type="checkbox" id="countdown" checked> นับถอยหลัง 3-2-1 ก่อนเปิดโจทย์</label>
+      <label>Spotlight <select id="spotlight"><option value="">อัตโนมัติ (4 อันดับแรก)</option></select></label>
+    </div>
+    <div class="reveal-box" id="revealBox" hidden>
+      <span id="revealText"></span>
+      <div class="spacer"></div>
+      <button class="btn go" type="button" id="revealNext">▶ เปิดผลคนถัดไป</button>
+      <button class="btn" type="button" id="revealAll">เปิดทั้งหมด</button>
+    </div>
+  </div>
+</details>
+<details class="setter" id="setter" open>
+  <summary>โจทย์และคลังโจทย์</summary>
+  <div class="setter-body">
+    <aside class="bank" aria-label="คลังโจทย์">
+      <div class="bank-head"><b>คลังโจทย์</b><span class="muted" id="bankCount"></span></div>
+      <input type="search" id="bankSearch" placeholder="ค้นหาชื่อโจทย์">
+      <div class="bank-actions">
+        <button class="btn small" type="button" id="bankNew">โจทย์ใหม่</button>
+        <label class="btn small">นำเข้า .md<input type="file" id="bankImport" accept=".md,.markdown,.txt" multiple hidden></label>
+      </div>
+      <ul class="bank-list" id="bankList"></ul>
+    </aside>
+    <div class="setter-main">
+    <div class="setter-tools">
+      <span class="editing-label" id="editingLabel"></span>
+      <span class="saved-state" id="savedState"></span>
+      <div class="spacer"></div>
+      <button class="btn small" type="button" id="bankSave">บันทึกลงคลัง</button>
+      <button class="btn small" type="button" id="bankSaveAs">บันทึกเป็นโจทย์ใหม่</button>
+      <button class="btn small" type="button" id="bankDownload">ดาวน์โหลด .md</button>
+    </div>
+    <div class="setter-tools">
+      <button class="btn small" type="button" id="addExample">+ ตัวอย่าง</button>
+      <button class="btn small" type="button" id="addTest">+ เทสเคสลับ</button>
+      <button class="btn small" type="button" id="addLimit">+ จำกัดเวลา</button>
+      <span class="summary-line" id="summary"></span>
+      <div class="spacer"></div>
+      <span class="dirty" id="dirty" hidden>ยังไม่ได้เผยแพร่</span>
+      <button class="btn go" type="button" id="publish">เผยแพร่โจทย์</button>
+    </div>
+    <div class="setter-split">
+      <textarea id="md" spellcheck="false" aria-label="Markdown ของโจทย์"></textarea>
+      <div class="preview md" id="preview" aria-label="หน้าจอที่ผู้เล่นจะเห็น"></div>
+    </div>
+    </div>
+  </div>
+</details>
+
+<main class="arena" id="arena" aria-label="จอของผู้เล่น"></main>
+<button class="btn jump" type="button" id="jump">ดูจอผู้เล่น ▾</button>
+
+<template id="cardTpl">
+  <section class="card">
+    <div class="card-head">
+      <span class="seat"></span>
+      <span class="pname"></span>
+      <span class="tag acode-tag" title="รหัสเข้าใช้"></span>
+      <span class="tag conn"></span>
+      <span class="tag lang"></span>
+      <span class="tag run" hidden>กำลังรัน</span>
+      <span class="tag score" title="คะแนนที่ดีที่สุด"></span>
+      <span class="tag win" hidden>🏆 ผู้ชนะ</span>
+      <div class="spacer"></div>
+      <button class="btn ghost spot-btn" title="แสดงคนนี้เต็มจอผู้ชม">🎥</button>
+      <button class="btn ghost kick">นำออก</button>
+      <button class="btn full-btn">ดูเต็มจอ</button>
+    </div>
+    <div class="ed"></div>
+    <div class="console"></div>
+  </section>
+</template>
+
+<div class="overlay" id="loginOverlay">
+  <form class="dialog" id="loginForm">
+    <h2>เข้าสู่ระบบผู้ดูแล</h2>
+    <label>รหัสผ่าน <input type="password" id="pw" required autofocus></label>
+    <p class="error" id="loginErr"></p>
+    <button class="btn go" type="submit">เข้าสู่ระบบ</button>
+  </form>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/vendor/marked.min.js"></script>
+<script src="/vendor/purify.min.js"></script>
+<script src="/vendor/katex/katex.min.js"></script>
+<script src="problem-view.js"></script>
+<script src="/vendor/monaco/vs/loader.js"></script>
+<script>
+const MONACO = location.origin + '/vendor/monaco/';
+window.MonacoEnvironment = { getWorkerUrl: () => 'data:text/javascript;charset=utf-8,' + encodeURIComponent(
+  `self.MonacoEnvironment={baseUrl:'${MONACO}'};importScripts('${MONACO}vs/base/worker/workerMain.js');`) };
+
+const $ = (id) => document.getElementById(id);
+const socket = io();
+const cards = {};   // slot -> { el, editor, pending }
+let match = { status: 'waiting' };
+
+// ---------- การ์ดผู้เล่น ----------
+const COLORS = ['#f2b84b', '#6cb6ff', '#5fd08f', '#ff8fa3', '#b69cff', '#4fd1c5', '#ff9f5a', '#e2e86c'];
+const colorOf = (slot) => COLORS[(slot - 1) % COLORS.length];
+const metas = {};
+let monacoReady = false;
+
+function makeEditor(slot) {
+  const c = cards[slot];
+  c.editor = monaco.editor.create(c.el.querySelector('.ed'), {
+    value: '', language: 'python', theme: 'vs-dark', readOnly: true, automaticLayout: true,
+    fontFamily: 'JetBrains Mono, Consolas, monospace', fontSize: 13, minimap: { enabled: false },
+    scrollBeyondLastLine: false,
+  });
+  if (c.pending) setCode(slot, c.pending.code, c.pending.lang);
+}
+
+// สร้างการ์ดใหม่ทั้งหมดตามจำนวนที่นั่ง
+function buildCards(st) {
+  for (const k of Object.keys(cards)) { cards[k].editor?.dispose(); delete cards[k]; }
+  for (const k of Object.keys(metas)) delete metas[k];
+  $('arena').replaceChildren();
+  const n = st.seatCount;
+  $('seatCount').value = n; $('seatCount').max = st.maxPlayers;
+  const cols = n <= 2 ? n : n <= 4 ? 2 : n <= 9 ? 3 : 4;
+  $('arena').style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+  // แถวเดียว = สูงเต็มจอ, หลายแถว = สูงพอดูโค้ดได้ แล้วเลื่อนลงดูแถวถัดไป
+  $('arena').style.setProperty('--row-h', n <= cols ? 'max(420px, calc(100vh - 60px))' : 'max(380px, 65vh)');
+  for (let slot = 1; slot <= n; slot++) {
+    const el = $('cardTpl').content.firstElementChild.cloneNode(true);
+    el.style.setProperty('--c', colorOf(slot));
+    el.querySelector('.seat').textContent = '#' + slot;
+    el.querySelector('.full-btn').onclick = () => toggleFull(slot);
+    el.querySelector('.spot-btn').onclick = () => socket.emit('stage:settings', { spotlight: stageState?.settings.spotlight === slot ? null : slot });
+    el.querySelector('.kick').onclick = () => {
+      if (confirm(`นำผู้เข้าแข่งขันลำดับ ${slot} ออกจากระบบ? (เข้าใหม่ด้วยรหัสเดิมได้ โค้ดที่เขียนไว้จะหาย)`)) socket.emit('admin:kick', slot);
+    };
+    $('arena').appendChild(el);
+    cards[slot] = { el, editor: null, pending: null };
+    if (monacoReady) makeEditor(slot);
+    const p = st.players[slot];
+    setMeta(slot, p); setCode(slot, p.code, p.lang);
+    p.console.forEach((e) => addConsole(slot, e));
+  }
+  renderRoster(st.roster);
+  setWinner(st.winner);
+  if (stageState) renderStage(stageState);
+}
+
+$('seatForm').onsubmit = (e) => {
+  e.preventDefault();
+  const n = Number($('seatCount').value);
+  const current = Object.keys(cards).length;
+  const losing = Object.entries(metas).filter(([s, m]) => Number(s) > n && m.name).map(([s]) => s);
+  if (n < current && !confirm(`ลดจำนวนเหลือ ${n} คน — รหัสเข้าใช้ของลำดับ ${n + 1} ถึง ${current} จะถูกยกเลิก${losing.length ? ' (มีคนออนไลน์อยู่ จะถูกนำออก)' : ''} ยืนยัน?`)) { $('seatCount').value = current; return; }
+  socket.emit('admin:seatCount', n, (res) => { if (!res.ok) { alert(res.error); $('seatCount').value = current; } });
+};
+socket.on('admin:state', (st) => buildCards(st));
+
+// ปุ่มลัด: กระโดดลงไปดูจอผู้เล่น / กลับขึ้นไปส่วนตั้งโจทย์
+function updateJump() {
+  const atArena = $('arena').getBoundingClientRect().top < window.innerHeight * 0.5;
+  $('jump').textContent = atArena ? 'ขึ้นไปตั้งโจทย์ ▴' : 'ดูจอผู้เล่น ▾';
+}
+$('jump').onclick = () => {
+  if ($('arena').getBoundingClientRect().top < window.innerHeight * 0.5) window.scrollTo({ top: 0, behavior: 'smooth' });
+  else $('arena').scrollIntoView({ behavior: 'smooth' });
+};
+window.addEventListener('scroll', updateJump, { passive: true });
+window.addEventListener('resize', updateJump);
+updateJump();
+
+// ---------- อันดับ ----------
+function renderBoard() {
+  const rows = Object.entries(metas).filter(([, m]) => m.name).map(([s, m]) => ({ slot: Number(s), ...m }));
+  rows.sort((a, b) => (b.best?.passed ?? -1) - (a.best?.passed ?? -1) || (a.best?.at ?? Infinity) - (b.best?.at ?? Infinity) || a.slot - b.slot);
+  const board = $('board');
+  board.hidden = rows.length < 2;
+  const lbl = document.createElement('span'); lbl.className = 'lbl'; lbl.textContent = 'อันดับ';
+  board.replaceChildren(lbl);
+  rows.forEach((r, i) => {
+    const chip = document.createElement('span');
+    chip.className = 'chip' + (r.best && r.best.passed === r.best.total ? ' full' : '');
+    const rk = document.createElement('span'); rk.className = 'rk'; rk.textContent = i + 1;
+    const sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = colorOf(r.slot);
+    const nm = document.createElement('span'); nm.textContent = r.name;
+    const pts = document.createElement('span'); pts.className = 'pts';
+    pts.textContent = r.best ? `${r.best.passed}/${r.best.total}` : '-';
+    chip.append(rk, sw, nm, pts);
+    board.appendChild(chip);
+  });
+}
+
+function toggleFull(slot) {
+  const c = cards[slot];
+  const on = !c.el.classList.contains('full');
+  Object.values(cards).forEach((x) => x.el.classList.remove('full'));
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  if (on) {
+    c.el.classList.add('full');
+    c.el.requestFullscreen?.().catch(() => {}); // ใช้เต็มจอของเบราว์เซอร์ถ้าทำได้
+  }
+  Object.values(cards).forEach((x) => {
+    const full = x.el.classList.contains('full');
+    x.el.querySelector('.full-btn').textContent = full ? 'ออกจากเต็มจอ' : 'ดูเต็มจอ';
+    x.editor?.updateOptions({ fontSize: full ? 20 : 13 });
+  });
+}
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) {
+    const f = Object.entries(cards).find(([, x]) => x.el.classList.contains('full'));
+    if (f) toggleFull(Number(f[0]));
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const f = Object.entries(cards).find(([, x]) => x.el.classList.contains('full'));
+    if (f) toggleFull(Number(f[0]));
+  }
+});
+
+function setMeta(slot, m) {
+  if (!cards[slot]) return;
+  metas[slot] = m;
+  const el = cards[slot].el;
+  el.querySelector('.pname').textContent = m.name || 'ว่าง';
+  const conn = el.querySelector('.conn');
+  conn.textContent = !m.name ? 'รอผู้เล่น' : m.connected ? 'ออนไลน์' : 'หลุดการเชื่อมต่อ';
+  conn.className = 'tag conn ' + (m.connected ? 'live' : m.name ? 'off' : '');
+  el.querySelector('.lang').textContent = m.lang === 'cpp' ? 'C++17' : 'Python 3';
+  const run = el.querySelector('.run');
+  run.hidden = !m.running && !m.judging;
+  run.textContent = m.judging ? 'กำลังตรวจ' : 'กำลังรัน';
+  const sc = el.querySelector('.score');
+  sc.hidden = !m.name;
+  sc.textContent = m.best ? `ดีที่สุด ${m.best.passed}/${m.best.total} (ส่ง ${m.submissions} ครั้ง)` : `ยังไม่ส่ง`;
+  sc.classList.toggle('full', !!m.best && m.best.passed === m.best.total);
+  el.querySelector('.kick').hidden = !m.name;
+  renderBoard();
+}
+function setCode(slot, code, lang) {
+  const c = cards[slot];
+  if (!c) return;
+  if (!c.editor) { c.pending = { code, lang }; return; }
+  const model = c.editor.getModel();
+  monaco.editor.setModelLanguage(model, lang === 'cpp' ? 'cpp' : 'python');
+  if (model.getValue() !== code) model.applyEdits([{ range: model.getFullModelRange(), text: code }]);
+  c.el.querySelector('.lang').textContent = lang === 'cpp' ? 'C++17' : 'Python 3';
+}
+function addConsole(slot, { type, text }) {
+  if (!cards[slot]) return;
+  const box = cards[slot].el.querySelector('.console');
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  const span = document.createElement('span');
+  span.className = type; span.textContent = text;
+  box.appendChild(span);
+  if (atBottom) box.scrollTop = box.scrollHeight;
+}
+
+require.config({ paths: { vs: MONACO + 'vs' } });
+require(['vs/editor/editor.main'], () => {
+  monacoReady = true;
+  Object.keys(cards).forEach((slot) => makeEditor(Number(slot)));
+});
+
+// ---------- login ----------
+$('loginForm').onsubmit = (e) => { e.preventDefault(); login($('pw').value); };
+function login(pw) {
+  socket.emit('admin:login', pw, (res) => {
+    if (!res.ok) { $('loginErr').textContent = res.error; sessionStorage.removeItem('duel-admin'); return; }
+    sessionStorage.setItem('duel-admin', pw);
+    $('loginOverlay').hidden = true;
+    const s = res.state;
+    $('md').value = s.source; published = s.source;
+    publishedId = s.publishedId; currentId = s.publishedId; savedText = s.publishedId ? s.source : null;
+    bank = s.bank; renderBank(); refreshPreview();
+    renderLan(s.lanUrls);
+    lanBase = s.lanUrls?.[0] || location.origin;
+    if (s.stage) renderStage(s.stage);
+    const ex = $('exec');
+    ex.hidden = false;
+    ex.textContent = s.executor.mode === 'docker' ? '🐳 รันใน Docker' : '⚠ รันบนเครื่องโดยตรง';
+    ex.className = 'vis ' + (s.executor.mode === 'docker' ? 'hidden-p' : 'shown');
+    ex.title = s.executor.info;
+    buildCards(s);
+    roundCount = s.rounds?.at?.(-1)?.no ?? s.roundCount ?? 0; renderRoundButtons();
+  });
+}
+socket.on('connect', () => {
+  const pw = sessionStorage.getItem('duel-admin');
+  if (pw) login(pw);
+});
+
+// ---------- รายชื่อและรหัสเข้าใช้ ----------
+let roster = {};
+function renderRoster(r) {
+  roster = r || {};
+  const body = $('rosterBody');
+  const entries = Object.entries(roster);
+  const online = entries.filter(([, x]) => x.connected).length;
+  $('rosterSummary').textContent = `${entries.length} คน, ออนไลน์ ${online}`;
+  // อัปเดตแถวที่มีอยู่แทนการสร้างใหม่ เพื่อไม่ให้ช่องชื่อที่กำลังพิมพ์หาย
+  for (const [slot, x] of entries) {
+    let tr = body.querySelector(`tr[data-slot="${slot}"]`);
+    if (!tr) {
+      tr = document.createElement('tr'); tr.dataset.slot = slot;
+      const no = tr.insertCell(); no.textContent = slot;
+      const nameTd = tr.insertCell();
+      const input = document.createElement('input'); input.type = 'text'; input.maxLength = 40; input.placeholder = '(ผู้เข้าแข่งขันกรอกเอง)';
+      input.setAttribute('aria-label', 'ชื่อผู้เข้าแข่งขันลำดับ ' + slot);
+      input.addEventListener('change', () => socket.emit('admin:roster:name', { slot: Number(slot), name: input.value }));
+      nameTd.appendChild(input);
+      const codeTd = tr.insertCell(); codeTd.className = 'acode';
+      tr.insertCell().className = 'st';
+      const act = tr.insertCell();
+      const regen = document.createElement('button'); regen.type = 'button'; regen.className = 'btn small'; regen.textContent = 'สร้างรหัสใหม่';
+      regen.onclick = () => {
+        if (confirm(`สร้างรหัสใหม่ให้ลำดับ ${slot}? รหัสเดิมจะใช้ไม่ได้ และถ้าออนไลน์อยู่จะถูกนำออก`)) socket.emit('admin:roster:regen', Number(slot));
+      };
+      act.appendChild(regen);
+      body.appendChild(tr);
+    }
+    const input = tr.querySelector('input');
+    if (document.activeElement !== input) input.value = x.name;
+    tr.querySelector('.acode').textContent = x.accessCode;
+    const st = tr.querySelector('.st');
+    st.textContent = x.connected ? '● ออนไลน์' : '○ ยังไม่เข้า';
+    st.className = 'st ' + (x.connected ? 'on' : 'off');
+    const card = cards[slot];
+    if (card) card.el.querySelector('.acode-tag').textContent = x.accessCode;
+  }
+  body.querySelectorAll('tr').forEach((tr) => { if (!roster[tr.dataset.slot]) tr.remove(); });
+}
+socket.on('admin:roster', (r) => { renderRoster(r); if (stageState) renderStage(stageState); });
+
+const rosterRows = () => Object.entries(roster).map(([slot, x]) => ({ slot, name: x.name, code: x.accessCode }));
+function downloadCsv(filename, rows) {
+  const esc = (v) => `"${String(v ?? '').replaceAll('"', '""')}"`;
+  const csv = '\ufeff' + rows.map((r) => r.map(esc).join(',')).join('\r\n'); // BOM ให้ Excel อ่านภาษาไทยถูก
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$('rosterCsv').onclick = () => downloadCsv('รหัสเข้าใช้.csv', [['ลำดับ', 'ชื่อ', 'รหัสเข้าใช้'], ...rosterRows().map((r) => [r.slot, r.name, r.code])]);
+$('printCards').onclick = () => {
+  const url = (Object.values(roster).length ? location.origin : '') + '/player.html';
+  const lanUrl = document.querySelector('#lan code')?.textContent || url;
+  const w = window.open('', '_blank');
+  if (!w) return alert('เบราว์เซอร์บล็อกหน้าต่างใหม่ — อนุญาต pop-up แล้วลองอีกครั้ง');
+  const d = w.document;
+  d.title = 'บัตรรหัสเข้าใช้ — Code Duel';
+  const style = d.createElement('style');
+  style.textContent = `body{font-family:'IBM Plex Sans Thai',system-ui,sans-serif;margin:12mm;color:#111}
+    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6mm}
+    .c{border:1px dashed #888;border-radius:3mm;padding:5mm 6mm;break-inside:avoid}
+    .t{font-size:11pt;color:#555}.n{font-size:15pt;font-weight:600;margin:1mm 0 3mm;min-height:1.3em}
+    .code{font-family:ui-monospace,Consolas,monospace;font-size:26pt;letter-spacing:2pt;font-weight:700}
+    .u{font-size:10pt;color:#333;margin-top:3mm;word-break:break-all}
+    @media print{body{margin:8mm}}`;
+  d.head.appendChild(style);
+  const grid = d.createElement('div'); grid.className = 'grid';
+  for (const r of rosterRows()) {
+    const c = d.createElement('div'); c.className = 'c';
+    const t = d.createElement('div'); t.className = 't'; t.textContent = `Code Duel — ลำดับ ${r.slot}`;
+    const n = d.createElement('div'); n.className = 'n'; n.textContent = r.name || 'ชื่อ: ______________________';
+    const code = d.createElement('div'); code.className = 'code'; code.textContent = r.code;
+    const u = d.createElement('div'); u.className = 'u'; u.textContent = 'เข้าที่ ' + lanUrl;
+    c.append(t, n, code, u); grid.appendChild(c);
+  }
+  d.body.appendChild(grid);
+  setTimeout(() => w.print(), 300);
+};
+socket.on('player:meta', (m) => setMeta(m.slot, m));
+socket.on('player:code', ({ slot, code, lang }) => setCode(slot, code, lang));
+socket.on('player:console', (e) => addConsole(e.slot, e));
+socket.on('player:console:clear', ({ slot }) => cards[slot]?.el.querySelector('.console').replaceChildren());
+
+// ---------- โจทย์ (markdown) ----------
+let published = '', previewTimer;
+function showSummary(p) {
+  $('summary').textContent = `ตัวอย่าง ${p.examples.length} ชุด, เทสเคสลับ ${p.testCount} ชุด, จำกัด ${p.timeLimit} วินาที/เทส`
+    + (p.testCount ? '' : ' — ยังไม่มีเทสเคสลับ ผู้เล่นจะส่งคำตอบไม่ได้');
+}
+function refreshPreview() {
+  socket.emit('admin:preview', $('md').value, (p) => { renderProblem($('preview'), p); showSummary(p); });
+  $('dirty').hidden = $('md').value === published;
+}
+$('md').addEventListener('input', () => { clearTimeout(previewTimer); previewTimer = setTimeout(refreshPreview, 300); $('dirty').hidden = $('md').value === published; renderEditing(); });
+function insertAtCursor(text) {
+  const t = $('md'), a = t.selectionStart;
+  t.setRangeText(text, a, t.selectionEnd, 'end');
+  t.focus(); refreshPreview(); renderEditing();
+}
+const IO_BLOCK = (tag) => `\n<${tag}>\n<input>\n\n</input>\n<output>\n\n</output>\n</${tag}>\n`;
+$('addExample').onclick = () => insertAtCursor(IO_BLOCK('example'));
+$('addTest').onclick = () => insertAtCursor(IO_BLOCK('test'));
+$('addLimit').onclick = () => insertAtCursor('\n<timelimit>2</timelimit>\n');
+$('md').addEventListener('keydown', (e) => {
+  if (e.key === 'Tab') { e.preventDefault(); insertAtCursor('    '); }
+});
+$('publish').onclick = () => {
+  if (match.status === 'running' && !confirm('เปลี่ยนโจทย์ระหว่างแข่ง? คะแนนของผู้เล่นทุกคนจะถูกล้าง')) return;
+  const bankId = currentId && $('md').value === savedText ? currentId : null;
+  socket.emit('admin:problem', { markdown: $('md').value, bankId }, (p) => {
+    published = $('md').value; $('dirty').hidden = true; showSummary(p);
+  });
+};
+socket.on('admin:source', (src) => { published = src; $('dirty').hidden = $('md').value === published; });
+
+// ---------- จอผู้ชม ----------
+let stageState = null, lanBase = location.origin;
+function stageBase() { return ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) ? lanBase : location.origin; }
+function renderStage(st) {
+  stageState = st;
+  const s = st.settings;
+  const sb = stageBase() + '/scoreboard.html', sp = stageBase() + '/spectator.html?key=' + encodeURIComponent(st.key);
+  $('sbUrl').textContent = sb; $('sbOpen').href = sb;
+  $('spUrl').textContent = sp; $('spOpen').href = sp;
+  const set = (id, v, prop = 'value') => { if (document.activeElement !== $(id)) $(id)[prop] = v; };
+  set('codeMode', s.codeMode); set('delayMin', s.delayMin); set('freezeMin', s.freezeMin); set('countdown', s.countdown, 'checked');
+  $('delayRow').hidden = s.codeMode !== 'delayed';
+  // Spotlight: รายชื่อจาก roster
+  const sel = $('spotlight'), cur = s.spotlight == null ? '' : String(s.spotlight);
+  const opts = [['', 'อัตโนมัติ (4 อันดับแรก)'], ...Object.entries(roster).map(([slot, x]) => [slot, `${slot}. ${x.name || '(ยังไม่มีชื่อ)'}`])];
+  if (sel.options.length !== opts.length || [...sel.options].some((o, i) => o.textContent !== opts[i][1])) {
+    sel.replaceChildren(...opts.map(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; return o; }));
+  }
+  sel.value = cur;
+  for (const [slot, c] of Object.entries(cards)) {
+    const b = c.el.querySelector('.spot-btn');
+    b.classList.toggle('spot', Number(slot) === s.spotlight);
+    b.textContent = Number(slot) === s.spotlight ? '🎥 Spotlight' : '🎥';
+  }
+  const mode = { hidden: 'ซ่อนโค้ด', delayed: `โค้ดหน่วง ${s.delayMin} นาที`, live: 'โค้ดสด' }[s.codeMode];
+  $('stageSummary').textContent = `${mode}, ${s.freezeMin ? `แช่แข็ง ${s.freezeMin} นาทีสุดท้าย` : 'ไม่แช่แข็ง'}${st.frozen ? ' — 🧊 กำลังแช่แข็ง' : ''}${st.reveal && !st.reveal.done ? ' — 🏆 รอประกาศผล' : ''}`;
+  const rb = $('revealBox');
+  rb.hidden = !(st.reveal && !st.reveal.done);
+  if (!rb.hidden) {
+    $('revealText').textContent = `🏆 ประกาศผลบนจอผู้ชม — เปิดแล้ว ${st.reveal.i} จาก ${st.reveal.total} คน (จากอันดับล่างขึ้นบน)`;
+    $('stagePanel').open = true;
+  }
+}
+socket.on('stage:admin', renderStage);
+const sendStage = (p) => socket.emit('stage:settings', p);
+$('codeMode').onchange = () => sendStage({ codeMode: $('codeMode').value });
+$('delayMin').onchange = () => sendStage({ delayMin: $('delayMin').value });
+$('freezeMin').onchange = () => sendStage({ freezeMin: $('freezeMin').value });
+$('countdown').onchange = () => sendStage({ countdown: $('countdown').checked });
+$('spotlight').onchange = () => sendStage({ spotlight: $('spotlight').value || null });
+$('rotateKey').onclick = () => { if (confirm('สร้างคีย์ผู้ชมใหม่? จอผู้ชมที่เปิดอยู่ด้วยลิงก์เดิมจะถูกตัดทันที')) socket.emit('stage:key:rotate'); };
+$('revealNext').onclick = () => socket.emit('stage:reveal', {});
+$('revealAll').onclick = () => { if (confirm('เปิดผลทุกคนพร้อมกัน?')) socket.emit('stage:reveal', { all: true }); };
+document.querySelectorAll('[data-copy]').forEach((b) => b.onclick = async () => {
+  const ok = await copyText($(b.dataset.copy).textContent);
+  b.textContent = ok ? 'คัดลอกแล้ว' : 'คัดลอกไม่ได้'; setTimeout(() => (b.textContent = 'คัดลอก'), 1200);
+});
+
+// ---------- ที่อยู่สำหรับเครื่องอื่นในวงแลน ----------
+function renderLan(urls) {
+  const box = $('lan');
+  box.replaceChildren('ให้ผู้เล่นเปิด:');
+  // ถ้าผู้ดูแลเปิดผ่าน IP อยู่แล้ว ใช้ที่อยู่นั้น ไม่งั้นแสดง IP วงแลนทั้งหมดของเครื่องเซิร์ฟเวอร์
+  const isLocal = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+  const list = isLocal ? urls : [location.origin];
+  if (!list.length) { box.append(' ไม่พบ IP วงแลนของเครื่องเซิร์ฟเวอร์ — ตรวจการเชื่อมต่อเครือข่าย'); box.hidden = false; return; }
+  for (const u of list) {
+    const code = document.createElement('code'); code.textContent = u + '/player.html';
+    const copy = document.createElement('button'); copy.className = 'btn ghost small'; copy.textContent = 'คัดลอก';
+    copy.onclick = async () => { copy.textContent = (await copyText(code.textContent)) ? 'คัดลอกแล้ว' : 'คัดลอกไม่ได้'; setTimeout(() => (copy.textContent = 'คัดลอก'), 1200); };
+    box.append(code, copy);
+  }
+  box.hidden = false;
+}
+
+// ---------- คลังโจทย์ ----------
+let bank = [], currentId = null, savedText = null, publishedId = null;
+const titleOf = (md) => (md.match(/^#\s+(.+)$/m)?.[1] || 'ไม่มีชื่อ').trim();
+const fmtTime = (ms) => new Date(ms).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+const unsaved = () => savedText === null || $('md').value !== savedText;
+
+function renderEditing() {
+  const label = $('editingLabel');
+  label.replaceChildren(currentId ? 'กำลังแก้: ' : 'โจทย์ใหม่: ');
+  const b = document.createElement('b'); b.textContent = titleOf($('md').value); label.appendChild(b);
+  const st = $('savedState');
+  if (!currentId) { st.textContent = 'ยังไม่อยู่ในคลัง'; st.className = 'saved-state unsaved'; }
+  else if (unsaved()) { st.textContent = 'มีการแก้ไขที่ยังไม่บันทึก'; st.className = 'saved-state unsaved'; }
+  else { st.textContent = 'บันทึกแล้ว'; st.className = 'saved-state ok'; }
+  $('bankSave').textContent = currentId ? 'บันทึกลงคลัง' : 'บันทึกเข้าคลัง';
+  $('bankSaveAs').hidden = !currentId;
+}
+
+function renderBank() {
+  const q = $('bankSearch').value.trim().toLowerCase();
+  const list = $('bankList');
+  list.replaceChildren();
+  $('bankCount').textContent = `${bank.length} ข้อ`;
+  const rows = bank.filter((b) => !q || b.title.toLowerCase().includes(q));
+  if (!rows.length) {
+    const li = document.createElement('li'); li.className = 'bank-empty';
+    li.textContent = bank.length ? 'ไม่พบโจทย์ที่ค้นหา' : 'ยังไม่มีโจทย์ในคลัง กด "บันทึกเข้าคลัง" เพื่อเก็บโจทย์ที่กำลังเขียน';
+    list.appendChild(li);
+  }
+  for (const b of rows) {
+    const li = document.createElement('li');
+    if (b.id === currentId) li.className = 'editing';
+    const item = document.createElement('button');
+    item.type = 'button'; item.className = 'bank-item';
+    const t = document.createElement('span'); t.className = 't'; t.textContent = b.title;
+    if (b.id === publishedId) { const live = document.createElement('span'); live.className = 'live'; live.textContent = 'กำลังใช้'; t.appendChild(live); }
+    const meta = document.createElement('span'); meta.className = 'meta';
+    meta.textContent = `ตัวอย่าง ${b.examples}, เทส ${b.tests}, ${fmtTime(b.updatedAt)}`;
+    item.append(t, meta);
+    item.onclick = () => openFromBank(b.id);
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'bank-del'; del.textContent = 'ลบ';
+    del.setAttribute('aria-label', 'ลบโจทย์ ' + b.title);
+    del.onclick = () => deleteFromBank(b);
+    li.append(item, del);
+    list.appendChild(li);
+  }
+  renderEditing();
+}
+$('bankSearch').addEventListener('input', renderBank);
+socket.on('bank:list', (list) => { bank = list; renderBank(); });
+socket.on('bank:published', (id) => { publishedId = id; renderBank(); });
+
+const confirmDiscard = () => !unsaved() || !$('md').value.trim() || confirm('ทิ้งการแก้ไขที่ยังไม่บันทึกลงคลัง?');
+
+function openFromBank(id) {
+  if (id === currentId && !unsaved()) return;
+  if (!confirmDiscard()) return;
+  socket.emit('bank:get', id, (res) => {
+    if (!res.ok) return alert(res.error);
+    currentId = res.id; savedText = res.markdown;
+    $('md').value = res.markdown;
+    refreshPreview(); renderBank();
+  });
+}
+function saveToBank(asNew) {
+  const markdown = $('md').value;
+  socket.emit('bank:save', { id: asNew ? null : currentId, markdown }, (res) => {
+    if (!res.ok) return alert(res.error);
+    currentId = res.id; savedText = markdown;
+    renderBank();
+  });
+}
+function deleteFromBank(b) {
+  if (!confirm(`ลบโจทย์ "${b.title}" ออกจากคลัง? กู้คืนไม่ได้`)) return;
+  socket.emit('bank:delete', b.id, () => {
+    if (currentId === b.id) { currentId = null; savedText = null; }
+    renderBank();
+  });
+}
+$('bankSave').onclick = () => saveToBank(false);
+$('bankSaveAs').onclick = () => saveToBank(true);
+$('bankNew').onclick = () => {
+  if (!confirmDiscard()) return;
+  currentId = null; savedText = null;
+  $('md').value = '# ชื่อโจทย์\n\nรายละเอียดโจทย์\n\n## ข้อมูลนำเข้า\n\n\n## ข้อมูลส่งออก\n\n\n## ตัวอย่าง\n' + IO_BLOCK('example') + '\n<timelimit>2</timelimit>\n' + IO_BLOCK('test');
+  refreshPreview(); renderBank(); $('md').focus();
+};
+$('bankDownload').onclick = () => {
+  const name = titleOf($('md').value).replace(/[\\/:*?"<>|]+/g, '').slice(0, 60) || 'problem';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([$('md').value], { type: 'text/markdown;charset=utf-8' }));
+  a.download = name + '.md';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('bankImport').onchange = async (e) => {
+  const files = [...e.target.files];
+  e.target.value = '';
+  let ok = 0;
+  for (const f of files) {
+    const markdown = await f.text();
+    const res = await new Promise((r) => socket.emit('bank:save', { markdown }, r));
+    if (res.ok) ok++;
+  }
+  alert(`นำเข้าโจทย์ ${ok} จาก ${files.length} ไฟล์ เข้าคลังแล้ว`);
+};
+
+function setWinner(w) {
+  for (const s of Object.keys(cards)) cards[s].el.querySelector('.win').hidden = !w || w.slot !== Number(s);
+  $('winnerBar').hidden = !w;
+  if (w) {
+    const t = Math.round(w.elapsedMs / 1000);
+    $('winnerBar').textContent = `🏆 ผู้เล่น ${w.slot} (${w.name}) ผ่านทุกเทสเคสเป็นคนแรก — ${Math.floor(t / 60)} นาที ${t % 60} วินาที`;
+  }
+}
+socket.on('winner', setWinner);
+
+// ---------- การแข่งขัน ----------
+$('start').onclick = () => {
+  if (match.status === 'running' && !confirm('เริ่มนับเวลารอบนี้ใหม่? คะแนนในรอบนี้จะถูกล้าง')) return;
+  if (match.status === 'ended' && !confirm('ยังไม่ได้กด "เตรียมรอบถัดไป" — โค้ดของรอบก่อนจะยังอยู่ เริ่มรอบใหม่เลยไหม?')) return;
+  socket.emit('admin:match', { action: 'start', durationMin: Number($('dur').value) });
+  $('setter').open = false;
+};
+$('end').onclick = () => { if (confirm('จบรอบนี้ตอนนี้? ระบบจะบันทึกผลและแสดงสรุปให้ผู้เข้าแข่งขัน')) socket.emit('admin:match', { action: 'end' }); };
+$('reset').onclick = () => {
+  const msg = match.status === 'running' ? 'กำลังแข่งอยู่ — จบรอบนี้ แล้วล้างโค้ดเพื่อเตรียมรอบถัดไป?' : 'ซ่อนโจทย์ ล้างโค้ดและ console ของทุกคน เพื่อเตรียมรอบถัดไป?';
+  if (confirm(msg)) socket.emit('admin:match', { action: 'reset' });
+};
+let roundCount = 0;
+function renderRoundButtons() {
+  const next = match.status === 'running' ? match.round : roundCount + 1;
+  $('start').textContent = match.status === 'running' ? `เริ่มรอบที่ ${match.round} ใหม่` : `เริ่มรอบที่ ${next}`;
+  $('roundPill').hidden = !match.round;
+  $('roundPill').textContent = match.round ? `รอบที่ ${match.round}` + (match.status === 'ended' ? ' (จบแล้ว)' : '') : '';
+}
+socket.on('results:changed', () => socket.emit('results:get', (r) => { roundCount = r.rounds.at(-1)?.no ?? 0; renderRoundButtons(); }));
+
+socket.on('match', (m) => {
+  match = m;
+  const st = $('status');
+  st.className = 'status-pill ' + m.status;
+  st.textContent = { waiting: 'รอเริ่ม', running: 'กำลังแข่ง', ended: 'หมดเวลา' }[m.status];
+  $('end').disabled = m.status !== 'running';
+  const vis = $('vis');
+  vis.textContent = m.status === 'waiting' ? '🔒 ผู้เล่นยังไม่เห็นโจทย์' : '👁 ผู้เล่นเห็นโจทย์แล้ว';
+  vis.className = 'vis ' + (m.status === 'waiting' ? 'hidden-p' : 'shown');
+  if (m.round) roundCount = Math.max(roundCount, m.round);
+  renderRoundButtons();
+});
+setInterval(() => {
+  const c = $('clock');
+  if (match.status !== 'running') { c.textContent = match.status === 'ended' ? '00:00' : '--:--'; c.classList.remove('low'); return; }
+  const s = Math.floor(Math.max(0, match.startedAt + match.durationMin * 60000 - Date.now()) / 1000);
+  c.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  c.classList.toggle('low', s < 60);
+}, 250);
+</script>
+</body>
+</html>

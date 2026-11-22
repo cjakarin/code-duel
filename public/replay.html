@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Replay — Code Duel</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="style.css">
+<style>
+  body { display: flex; flex-direction: column; }
+  .who { font-weight: 600; }
+  .sub { color: var(--muted); font-size: 14px; }
+  main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 280px; }
+  .stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  #editor { flex: 1; min-height: 240px; }
+  .side { border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: var(--panel-2); }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 12px; border-bottom: 1px solid var(--line); }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+  .stat b { display: block; font-family: var(--mono); font-size: 17px; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  .events { list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; }
+  .events li button { display: flex; gap: 8px; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 6px 12px; cursor: pointer; font-size: 13px; color: var(--text); }
+  .events li button:hover { background: var(--panel); }
+  .events li.past button { opacity: .55; }
+  .events .tm { font-family: var(--mono); color: var(--muted); min-width: 44px; }
+
+  .controls { border-top: 1px solid var(--line); background: var(--panel-2); padding: 8px 12px 10px; display: grid; gap: 6px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .time { font-family: var(--mono); font-size: 15px; min-width: 120px; }
+  .track { position: relative; height: 18px; }
+  .marks { position: absolute; inset: 0; pointer-events: none; }
+  .mark { position: absolute; top: 2px; width: 3px; height: 14px; border-radius: 2px; margin-left: -1px; pointer-events: auto; cursor: pointer; }
+  .mark.run { background: var(--p2); }
+  .mark.ce { background: #ff9f5a; }
+  .mark.ok { background: var(--ok); width: 5px; margin-left: -2px; }
+  .mark.wa { background: var(--bad); width: 5px; margin-left: -2px; }
+  .mark.paste { background: var(--p1); top: 0; height: 18px; }
+  #seek { width: 100%; margin: 0; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  .replay-ins { background: rgba(242, 184, 75, .28); }
+  .notice { padding: 6px 12px; background: #2b2a1a; color: var(--p1); font-size: 14px; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } .side { border-left: 0; border-top: 1px solid var(--line); max-height: 40vh; } }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="v">Code</span> <span class="s">Duel</span> <span style="color:var(--muted)">Replay</span></div>
+  <span class="who" id="who"></span>
+  <span class="sub" id="roundInfo"></span>
+  <div class="spacer"></div>
+  <label class="sub">ดูคนอื่น <select id="pick" aria-label="เลือกผู้เข้าแข่งขัน"></select></label>
+</header>
+<div class="notice" id="notice" hidden></div>
+
+<main>
+  <section class="stage">
+    <div id="editor"></div>
+    <div class="controls">
+      <div class="track">
+        <input type="range" id="seek" min="0" max="1000" value="0" step="1" aria-label="ตำแหน่งเวลา">
+        <div class="marks" id="marks"></div>
+      </div>
+      <div class="row">
+        <button class="btn go" id="play" title="เล่น/หยุด (Space)">▶ เล่น</button>
+        <button class="btn small" id="prev" title="การเปลี่ยนแปลงก่อนหน้า (←)">◀ ทีละขั้น</button>
+        <button class="btn small" id="next" title="การเปลี่ยนแปลงถัดไป (→)">ทีละขั้น ▶</button>
+        <label class="sub">ความเร็ว
+          <select id="speed"><option>1</option><option>2</option><option selected>5</option><option>10</option><option>30</option><option>60</option></select>×
+        </label>
+        <label class="sub"><input type="checkbox" id="skipIdle" checked> ข้ามช่วงที่ไม่ได้พิมพ์</label>
+        <div class="spacer"></div>
+        <span class="time" id="time">0:00 / 0:00</span>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--p2)"></i>รันโค้ด</span>
+        <span><i style="background:#ff9f5a"></i>คอมไพล์ไม่ผ่าน</span>
+        <span><i style="background:var(--ok)"></i>ส่ง ผ่านครบ</span>
+        <span><i style="background:var(--bad)"></i>ส่ง ยังไม่ครบ</span>
+        <span><i style="background:var(--p1)"></i>วางโค้ดก้อนใหญ่</span>
+      </div>
+    </div>
+  </section>
+  <aside class="side" aria-label="สรุปและเหตุการณ์">
+    <div class="stats" id="stats"></div>
+    <ul class="events" id="events"></ul>
+  </aside>
+</main>
+
+<div class="overlay" id="loginOverlay" hidden>
+  <form class="dialog" id="loginForm">
+    <h2>เข้าสู่ระบบผู้ดูแล</h2>
+    <label>รหัสผ่าน <input type="password" id="pw" required autofocus></label>
+    <p class="error" id="loginErr"></p>
+    <button class="btn go" type="submit">เข้าสู่ระบบ</button>
+  </form>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/vendor/monaco/vs/loader.js"></script>
+<script>
+const MONACO = location.origin + '/vendor/monaco/';
+window.MonacoEnvironment = { getWorkerUrl: () => 'data:text/javascript;charset=utf-8,' + encodeURIComponent(
+  `self.MonacoEnvironment={baseUrl:'${MONACO}'};importScripts('${MONACO}vs/base/worker/workerMain.js');`) };
+
+const $ = (id) => document.getElementById(id);
+const socket = io();
+const params = new URLSearchParams(location.search);
+let roundNo = Number(params.get('round')), slot = Number(params.get('slot'));
+let R = null;                 // replay data
+let keyframes = [];           // ทุก ๆ 200 ขั้น เก็บข้อความไว้ เพื่อกระโดดไปช่วงไหนก็ได้เร็ว
+let idx = -1;                 // จำนวน op ที่ใช้ไปแล้ว - 1
+let vt = 0;                   // เวลาเสมือนที่กำลังแสดง (ms)
+let playing = false, lastFrame = 0, editor, decos = [];
+const fmt = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const apply = (text, op) => text.slice(0, op.p) + op.i + text.slice(op.p + op.d);
+
+// ---------- โหลดข้อมูล ----------
+function login(pw) {
+  socket.emit('admin:login', pw, (res) => {
+    if (!res.ok) { $('loginErr').textContent = res.error; sessionStorage.removeItem('duel-admin'); $('loginOverlay').hidden = false; return; }
+    sessionStorage.setItem('duel-admin', pw);
+    $('loginOverlay').hidden = true;
+    load();
+  });
+}
+$('loginForm').onsubmit = (e) => { e.preventDefault(); login($('pw').value); };
+socket.on('connect', () => {
+  const pw = sessionStorage.getItem('duel-admin');
+  if (pw) login(pw); else $('loginOverlay').hidden = false;
+});
+
+function load() {
+  socket.emit('replay:get', { round: roundNo, slot }, (res) => {
+    if (!res.ok) { $('notice').hidden = false; $('notice').textContent = res.error; return; }
+    R = res.replay;
+    $('who').textContent = res.player.name;
+    $('roundInfo').textContent = `รอบที่ ${res.round.no} — ${res.round.title}` + (res.result ? ` · อันดับ ${res.result.rank} · ผ่าน ${res.result.passed}/${res.result.total}` : '');
+    document.title = `Replay ${res.player.name} รอบ ${res.round.no} — Code Duel`;
+    const pick = $('pick');
+    pick.replaceChildren(...res.others.map((o) => { const op = document.createElement('option'); op.value = o.slot; op.textContent = `${o.slot}. ${o.name}`; op.selected = o.slot === slot; return op; }));
+    $('notice').hidden = !R.truncated;
+    if (R.truncated) $('notice').textContent = 'บันทึกยาวเกินขีดจำกัด — ช่วงท้ายของรอบไม่ถูกบันทึก';
+    buildKeyframes();
+    renderStats(res.result);
+    renderTimeline();
+    whenEditor(() => { seek(0); });
+  });
+}
+$('pick').onchange = () => {
+  slot = Number($('pick').value);
+  history.replaceState(null, '', `?round=${roundNo}&slot=${slot}`);
+  pause(); load();
+};
+
+function buildKeyframes() {
+  keyframes = [{ idx: -1, text: R.startCode, lang: R.lang }];
+  let text = R.startCode, lang = R.lang;
+  R.ops.forEach((op, i) => {
+    text = apply(text, op);
+    if (op.l) lang = op.l;
+    if ((i + 1) % 200 === 0) keyframes.push({ idx: i, text, lang });
+  });
+}
+// สถานะของโค้ดหลังใช้ op ถึงลำดับ target
+function stateAt(target) {
+  let k = keyframes[0];
+  for (const f of keyframes) { if (f.idx <= target) k = f; else break; }
+  let text = k.text, lang = k.lang;
+  for (let i = k.idx + 1; i <= target; i++) { text = apply(text, R.ops[i]); if (R.ops[i].l) lang = R.ops[i].l; }
+  return { text, lang };
+}
+// op สุดท้ายที่เกิดก่อนหรือเท่ากับเวลา t
+function opIndexAt(t) {
+  let lo = 0, hi = R.ops.length - 1, ans = -1;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (R.ops[mid].t <= t) { ans = mid; lo = mid + 1; } else hi = mid - 1; }
+  return ans;
+}
+
+// ---------- แสดงผล ----------
+function renderStats(result) {
+  const typed = R.ops.reduce((n, o) => n + (o.paste ? 0 : o.i.length), 0);
+  const pasted = R.ops.reduce((n, o) => n + (o.paste ? o.i.length : 0), 0);
+  const runs = R.events.filter((e) => e.type === 'run').length;
+  const subs = R.events.filter((e) => e.type === 'submit').length;
+  const firstOk = R.events.find((e) => e.type === 'submit' && e.total && e.passed === e.total);
+  const items = [
+    [fmt(R.durationMs), 'ความยาวรอบ'], [firstOk ? fmt(firstOk.t) : '-', 'ผ่านครบเมื่อ'],
+    [typed.toLocaleString(), 'ตัวอักษรที่พิมพ์'], [`${R.pastes} ครั้ง`, `วางโค้ด (${pasted.toLocaleString()} ตัว)`],
+    [runs, 'รันโค้ด'], [subs, 'ส่งคำตอบ'],
+  ];
+  $('stats').replaceChildren(...items.map(([v, l]) => {
+    const d = document.createElement('div'); d.className = 'stat';
+    const b = document.createElement('b'); b.textContent = v;
+    const s = document.createElement('span'); s.textContent = l;
+    d.append(b, s); return d;
+  }));
+}
+function timelineItems() {
+  const items = R.events.map((e) => ({ t: e.t, cls: e.type === 'submit' ? (e.total && e.passed === e.total ? 'ok' : 'wa') : e.type,
+    text: e.type === 'run' ? 'รันโค้ด' : e.type === 'ce' ? 'คอมไพล์ไม่ผ่าน' : `ส่งคำตอบ ผ่าน ${e.passed}/${e.total}` }));
+  for (const op of R.ops) if (op.paste) items.push({ t: op.t, cls: 'paste', text: `วางโค้ด ${op.i.length} ตัวอักษร` });
+  return items.sort((a, b) => a.t - b.t);
+}
+function renderTimeline() {
+  const total = Math.max(1, R.durationMs);
+  $('seek').max = total;
+  const marks = $('marks'); marks.replaceChildren();
+  const list = $('events'); list.replaceChildren();
+  for (const it of timelineItems()) {
+    const m = document.createElement('span');
+    m.className = 'mark ' + it.cls; m.style.left = (it.t / total * 100) + '%'; m.title = `${fmt(it.t)} ${it.text}`;
+    m.onclick = () => { pause(); seek(it.t); };
+    marks.appendChild(m);
+    const li = document.createElement('li'); li.dataset.t = it.t;
+    const b = document.createElement('button'); b.type = 'button';
+    const tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = fmt(it.t);
+    const tx = document.createElement('span'); tx.textContent = it.text;
+    b.append(tm, tx); b.onclick = () => { pause(); seek(it.t); };
+    li.appendChild(b); list.appendChild(li);
+  }
+  if (!list.children.length) { const li = document.createElement('li'); li.className = 'sub'; li.style.padding = '12px'; li.textContent = 'ไม่มีการรันหรือส่งคำตอบ'; list.appendChild(li); }
+}
+
+// ---------- ตัวเขียนโค้ด (อ่านอย่างเดียว) ----------
+let editorReady = [];
+function whenEditor(fn) { editor ? fn() : editorReady.push(fn); }
+require.config({ paths: { vs: MONACO + 'vs' } });
+require(['vs/editor/editor.main'], () => {
+  editor = monaco.editor.create($('editor'), {
+    value: '', language: 'python', theme: 'vs-dark', readOnly: true, automaticLayout: true,
+    fontFamily: 'JetBrains Mono, Consolas, monospace', fontSize: 15, minimap: { enabled: true }, scrollBeyondLastLine: false,
+  });
+  editorReady.forEach((f) => f()); editorReady = [];
+});
+
+function show(target) {
+  const model = editor.getModel();
+  if (target === idx) return;
+  if (target > idx && target - idx <= 400) {
+    // เดินหน้าทีละ op ด้วยการแก้เฉพาะส่วน (ตำแหน่งเลื่อนจอไม่กระโดด)
+    for (let i = idx + 1; i <= target; i++) {
+      const op = R.ops[i];
+      const a = model.getPositionAt(op.p), b = model.getPositionAt(op.p + op.d);
+      model.applyEdits([{ range: new monaco.Range(a.lineNumber, a.column, b.lineNumber, b.column), text: op.i }]);
+      if (op.l) monaco.editor.setModelLanguage(model, op.l === 'cpp' ? 'cpp' : 'python');
+    }
+  } else {
+    const st = stateAt(target);
+    model.setValue(st.text);
+    monaco.editor.setModelLanguage(model, st.lang === 'cpp' ? 'cpp' : 'python');
+  }
+  idx = target;
+  // ไฮไลต์ส่วนที่เพิ่งเปลี่ยน และเลื่อนจอให้เห็น
+  const op = R.ops[idx];
+  if (op && op.i.length) {
+    const a = model.getPositionAt(op.p), b = model.getPositionAt(op.p + op.i.length);
+    decos = editor.deltaDecorations(decos, [{ range: new monaco.Range(a.lineNumber, a.column, b.lineNumber, b.column), options: { inlineClassName: 'replay-ins' } }]);
+    editor.revealPositionInCenterIfOutsideViewport(b);
+  } else decos = editor.deltaDecorations(decos, []);
+}
+function seek(t) {
+  if (!R || !editor) return;
+  vt = Math.max(0, Math.min(R.durationMs, t));
+  show(opIndexAt(vt));
+  $('seek').value = vt;
+  $('time').textContent = `${fmt(vt)} / ${fmt(R.durationMs)}`;
+  document.querySelectorAll('#events li[data-t]').forEach((li) => li.classList.toggle('past', Number(li.dataset.t) <= vt));
+}
+
+// ---------- เล่น ----------
+function frame(now) {
+  if (!playing) return;
+  const dt = now - lastFrame; lastFrame = now;
+  let next = vt + dt * Number($('speed').value);
+  if ($('skipIdle').checked) {
+    const upcoming = R.ops[idx + 1]?.t;
+    if (upcoming != null && upcoming - vt > 3000) next = Math.max(next, upcoming - 400); // ช่วงเงียบเกิน 3 วินาที → ข้าม
+  }
+  if (next >= R.durationMs) { seek(R.durationMs); pause(); return; }
+  seek(next);
+  requestAnimationFrame(frame);
+}
+function play() {
+  if (!R) return;
+  if (vt >= R.durationMs) seek(0);
+  playing = true; lastFrame = performance.now();
+  $('play').textContent = '❚❚ หยุด';
+  requestAnimationFrame(frame);
+}
+function pause() { playing = false; $('play').textContent = '▶ เล่น'; }
+$('play').onclick = () => (playing ? pause() : play());
+$('seek').addEventListener('input', () => { pause(); seek(Number($('seek').value)); });
+$('next').onclick = () => { pause(); const op = R.ops[idx + 1]; if (op) seek(op.t); };
+$('prev').onclick = () => { pause(); const op = R.ops[idx - 1]; seek(op ? op.t : 0); };
+document.addEventListener('keydown', (e) => {
+  if (e.target.closest('input, select, textarea') || !R) return;
+  if (e.key === ' ') { e.preventDefault(); playing ? pause() : play(); }
+  if (e.key === 'ArrowRight') { e.preventDefault(); $('next').click(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); $('prev').click(); }
+});
+</script>
+</body>
+</html>
