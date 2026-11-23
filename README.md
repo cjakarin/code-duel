@@ -2,6 +2,8 @@
 
 **ระบบประลองการเขียนโปรแกรมแบบเรียลไทม์ สำหรับห้องเรียน ค่าย และเวทีแข่งขัน**
 
+พัฒนาสำหรับรายวิชา 204355 การโปรแกรมเชิงแข่งขัน มหาวิทยาลัยเชียงใหม่ · ได้รับทุนจาก TLIC มช. ([รายละเอียด](#ทุนสนับสนุน))
+
 > **Code Duel** is a self-hosted, real-time competitive programming arena for classrooms and coding events. Students solve the same problem simultaneously in Python or C++, submissions are judged automatically against hidden test cases inside isolated Docker containers, and the whole room can follow along on a live scoreboard. Runs fully offline on a local network from a single server. *(Documentation below is in Thai.)*
 
 <!-- ภาพหน้าจอ: ใส่ไฟล์ไว้ในโฟลเดอร์ docs/ แล้วเปิดบรรทัดด้านล่าง
@@ -34,6 +36,7 @@
 11. [ใช้งานในวงแลน](#ใช้งานในวงแลน)
 12. [แก้ปัญหาที่พบบ่อย](#แก้ปัญหาที่พบบ่อย)
 13. [โครงสร้างโปรเจกต์](#โครงสร้างโปรเจกต์)
+14. [ทุนสนับสนุน](#ทุนสนับสนุน)
 
 ---
 
@@ -395,6 +398,20 @@ data/                  สร้างอัตโนมัติตอนรั
 
 **เทคโนโลยีที่ใช้:** Node.js, Express, Socket.IO, Docker, Monaco Editor, marked, DOMPurify, KaTeX
 
+## ทุนสนับสนุน
+
+โครงการนี้ได้รับทุนสนับสนุนจาก **ศูนย์นวัตกรรมการสอนและการเรียนรู้ (TLIC) มหาวิทยาลัยเชียงใหม่**
+ประจำภาคการศึกษาที่ 2/2569 ทุนประเภท A1D1 Level 1
+สำหรับรายวิชา **204355 การโปรแกรมเชิงแข่งขัน**
+
+> This project is supported by the **Teaching and Learning Innovation Center (TLIC), Chiang Mai University**, under the A1D1 Level 1 grant, 2nd semester of academic year 2569 (2026), for course **204355 Competitive Programming**.
+
+ผู้พัฒนา: [ชื่อผู้พัฒนา / อาจารย์ผู้รับผิดชอบรายวิชา]
+
 ## สัญญาอนุญาต
 
-[ยังไม่ได้ระบุ — เลือกสัญญาอนุญาตแล้วเพิ่มไฟล์ `LICENSE` เช่น MIT]
+เผยแพร่ภายใต้สัญญาอนุญาต **MIT** ดูรายละเอียดในไฟล์ [LICENSE](LICENSE)
+
+นำไปใช้ แก้ไข และแจกจ่ายต่อได้อย่างอิสระ รวมถึงใช้ในเชิงพาณิชย์ โดยต้องคงข้อความลิขสิทธิ์และสัญญาอนุญาตไว้ในสำเนาทุกชุด ซอฟต์แวร์นี้ให้มาตามสภาพ ไม่มีการรับประกันใด ๆ
+
+ไลบรารีที่ใช้มีสัญญาอนุญาตของตัวเอง: Express, Socket.IO, Monaco Editor, marked, KaTeX (MIT) และ DOMPurify (Apache-2.0 หรือ MPL-2.0)
