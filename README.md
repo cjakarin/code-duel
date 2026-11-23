@@ -406,7 +406,7 @@ data/                  สร้างอัตโนมัติตอนรั
 
 > This project is supported by the **Teaching and Learning Innovation Center (TLIC), Chiang Mai University**, under the A1D1 Level 1 grant, 2nd semester of academic year 2569 (2026), for course **204355 Competitive Programming**.
 
-ผู้พัฒนา: [ชื่อผู้พัฒนา / อาจารย์ผู้รับผิดชอบรายวิชา]
+ผู้พัฒนา: จักริน ชวชาติ
 
 ## สัญญาอนุญาต
 
