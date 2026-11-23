@@ -136,7 +136,7 @@
       <button class="pbtn ptoggle" type="button" id="toggleProblem" title="ซ่อน/แสดงโจทย์ (Ctrl+B)">◂ ซ่อนโจทย์</button>
       <select id="lang" aria-label="ภาษา">
         <option value="python">Python 3</option>
-        <option value="cpp">C++17</option>
+        <option value="cpp" id="cppOption">C++</option>
       </select>
       <div class="spacer"></div>
       <button class="btn" id="run" title="Ctrl+Enter">รันโค้ด</button>
@@ -309,6 +309,7 @@ function join(accessCode, name) {
     me = { slot: res.slot, name: res.name, accessCode: res.accessCode };
     sessionStorage.setItem('duel-me', JSON.stringify({ accessCode: res.accessCode }));
     templates = res.templates;
+    if (res.cxx) { $('cppOption').textContent = res.cxx.label; $('cppOption').title = '-std=' + res.cxx.std; }
     codes = { python: templates.python, cpp: templates.cpp, [res.lang]: res.code };
     showMe();
     $('joinErr').textContent = '';

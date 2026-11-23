@@ -23,6 +23,14 @@ const PLAYER_COUNT = Number(process.env.PLAYER_COUNT || 2);
 const MAX_PLAYERS = Number(process.env.MAX_PLAYERS || 40);
 // ที่รันโค้ด: docker (ค่าเริ่มต้น แยกในคอนเทนเนอร์) หรือ local (รันบนเครื่องนี้โดยตรงแบบ v1)
 const EXECUTOR = (process.env.EXECUTOR || 'docker').toLowerCase();
+// มาตรฐาน C++ ที่ใช้คอมไพล์ เช่น gnu++20 (ค่าเริ่มต้น), c++20, gnu++17, c++17, gnu++23
+const CXX_STD = (() => {
+  const v = (process.env.CXX_STD || 'gnu++20').trim().toLowerCase();
+  if (/^(c|gnu)\+\+(11|14|17|20|23|2a|2b)$/.test(v)) return v;
+  console.error(`✖ CXX_STD="${process.env.CXX_STD}" ไม่ถูกต้อง ใช้ได้เช่น gnu++20, c++20, gnu++17, c++17 — ใช้ค่าเริ่มต้น gnu++20 แทน`);
+  return 'gnu++20';
+})();
+const CXX_LABEL = 'C++' + CXX_STD.replace(/^(c|gnu)\+\+/, '').replace('2a', '20').replace('2b', '23') + (CXX_STD.startsWith('gnu') ? ' (GNU)' : '');
 const sandbox = createSandbox({
   executor: EXECUTOR,
   dockerCmd: process.env.DOCKER_CMD || 'docker',
@@ -34,6 +42,7 @@ const sandbox = createSandbox({
   lifetimeSec: 1800,                                // คอนเทนเนอร์หมดอายุเองภายใน 30 นาที
   pythonCmd: process.env.PYTHON_CMD || (process.platform === 'win32' ? 'python' : 'python3'),
   cxxCmd: process.env.CXX_CMD || 'g++',
+  cxxStd: CXX_STD,
 });
 let sandboxInfo = '';
 const RUN_TIMEOUT_MS = Number(process.env.RUN_TIMEOUT_MS || 60000);   // เวลารันสูงสุด (โหมดรันโค้ด)
@@ -288,6 +297,7 @@ const adminState = () => ({
   roster: rosterForAdmin(), eventName: event.name, roundCount: event.rounds.at(-1)?.no ?? 0,
   publishedId: state.publishedId, bank: bankList(), lanUrls: lanUrls(),
   executor: { mode: sandbox.mode, info: sandboxInfo },
+  cxx: { std: CXX_STD, label: CXX_LABEL },
   stage: stage?.adminState() ?? null,
   node: nodeStatus,
   players: Object.fromEntries(slots().map((s) => [s, { ...playerMeta(state.players[s]), code: state.players[s].code, console: state.players[s].console }])),
@@ -659,7 +669,7 @@ io.on('connection', (socket) => {
     io.to('admins').emit('player:code', { slot, code: p.code, lang: p.lang });
     const last = event.rounds.at(-1);
     cb({ ok: true, slot, name: r.name, accessCode: fmtCode(r.accessCode), lang: p.lang, code: p.code, console: p.console, running: p.running,
-      judging: p.judging, best: p.best, submissions: p.submissions, templates: TEMPLATES,
+      judging: p.judging, best: p.best, submissions: p.submissions, templates: TEMPLATES, cxx: { std: CXX_STD, label: CXX_LABEL },
       lastResult: state.match.status === 'ended' && last?.results ? publicRoundResult(last) : null });
   });
 
@@ -951,6 +961,7 @@ server.on('error', (e) => {
     console.log(`Code Duel v${require('./package.json').version} พร้อมใช้งาน`);
     console.log(`  ${nodeStatus.ok ? '✔' : '⚠'} ${nodeStatus.message}`);
     console.log(`  ที่รันโค้ด : ${sandboxInfo}`);
+    console.log(`  C++       : -std=${CXX_STD}`);
     console.log(`  เครื่องนี้ : http://localhost:${PORT}/admin.html  (รหัสผู้ดูแล: ${ADMIN_PASSWORD})`);
     if (!lan.length) console.log('  ไม่พบการ์ดเครือข่าย — ตรวจว่าเครื่องต่อวงแลน/Wi-Fi แล้ว');
     for (const a of lan) {

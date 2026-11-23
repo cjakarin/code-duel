@@ -410,7 +410,7 @@ function setMeta(slot, m) {
   const conn = el.querySelector('.conn');
   conn.textContent = !m.name ? 'รอผู้เล่น' : m.connected ? 'ออนไลน์' : 'หลุดการเชื่อมต่อ';
   conn.className = 'tag conn ' + (m.connected ? 'live' : m.name ? 'off' : '');
-  el.querySelector('.lang').textContent = m.lang === 'cpp' ? 'C++17' : 'Python 3';
+  el.querySelector('.lang').textContent = m.lang === 'cpp' ? cxxLabel : 'Python 3';
   const run = el.querySelector('.run');
   run.hidden = !m.running && !m.judging;
   run.textContent = m.judging ? 'กำลังตรวจ' : 'กำลังรัน';
@@ -428,7 +428,7 @@ function setCode(slot, code, lang) {
   const model = c.editor.getModel();
   monaco.editor.setModelLanguage(model, lang === 'cpp' ? 'cpp' : 'python');
   if (model.getValue() !== code) model.applyEdits([{ range: model.getFullModelRange(), text: code }]);
-  c.el.querySelector('.lang').textContent = lang === 'cpp' ? 'C++17' : 'Python 3';
+  c.el.querySelector('.lang').textContent = lang === 'cpp' ? cxxLabel : 'Python 3';
 }
 function addConsole(slot, { type, text }) {
   if (!cards[slot]) return;
@@ -454,6 +454,7 @@ function login(pw) {
     sessionStorage.setItem('duel-admin', pw);
     $('loginOverlay').hidden = true;
     const s = res.state;
+    if (s.cxx) cxxLabel = s.cxx.label;   // ก่อนสร้างการ์ด เพื่อให้ป้ายภาษาถูกตั้งแต่แรก
     $('md').value = s.source; published = s.source;
     publishedId = s.publishedId; currentId = s.publishedId; savedText = s.publishedId ? s.source : null;
     bank = s.bank; renderBank(); refreshPreview();
@@ -597,6 +598,7 @@ socket.on('admin:source', (src) => { published = src; $('dirty').hidden = $('md'
 
 // ---------- จอผู้ชม ----------
 let stageState = null, lanBase = location.origin;
+let cxxLabel = 'C++';
 function stageBase() { return ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) ? lanBase : location.origin; }
 function renderStage(st) {
   stageState = st;

@@ -1,6 +1,6 @@
 {
   "name": "code-duel",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Code Duel v2 — ระบบประลองการเขียนโปรแกรมเชิงแข่งขันแบบเรียลไทม์ รันโค้ดในคอนเทนเนอร์ Docker",
   "main": "server.js",
   "scripts": {

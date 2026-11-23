@@ -111,7 +111,7 @@ function dockerSandbox(cfg) {
         if (w.code !== 0) return { ok: false, output: 'เขียนไฟล์ในคอนเทนเนอร์ไม่สำเร็จ: ' + w.err };
         if (lang !== 'cpp') return { ok: true, output: '' };
         const c = await runCmd(D, execArgs(false, compileTimeoutMs,
-          ['g++', '-std=c++17', '-O2', '-pipe', '-o', '/work/main', '/work/main.cpp']), { timeoutMs: compileTimeoutMs + 10000 });
+          ['g++', `-std=${cfg.cxxStd}`, '-O2', '-pipe', '-o', '/work/main', '/work/main.cpp']), { timeoutMs: compileTimeoutMs + 10000 });
         const output = clean(c.err + c.out);
         if (c.code === 137) return { ok: false, output: output + `\nคอมไพล์นานเกิน ${sec(compileTimeoutMs)} วินาที หรือใช้หน่วยความจำเกิน` };
         return { ok: c.code === 0, output };
@@ -175,7 +175,7 @@ function localSandbox(cfg) {
           const exe = path.join(dir, process.platform === 'win32' ? 'main.exe' : 'main');
           fs.writeFileSync(src, code);
           try { fs.unlinkSync(exe); } catch (_) {}
-          const c = await runCmd(cfg.cxxCmd, ['-std=c++17', '-O2', '-o', exe, src], { timeoutMs: compileTimeoutMs });
+          const c = await runCmd(cfg.cxxCmd, [`-std=${cfg.cxxStd}`, '-O2', '-o', exe, src], { timeoutMs: compileTimeoutMs });
           cmd = [exe];
           const output = clean(c.err).replaceAll(src, 'main.cpp');
           return { ok: c.code === 0, output: c.code === -1 ? `เรียกคอมไพเลอร์ไม่ได้: ${c.err}` : output };
@@ -211,5 +211,6 @@ function localSandbox(cfg) {
 }
 
 module.exports = function createSandbox(cfg) {
+  cfg = { cxxStd: 'gnu++20', ...cfg };
   return cfg.executor === 'local' ? localSandbox(cfg) : dockerSandbox(cfg);
 };
