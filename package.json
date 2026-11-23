@@ -2,6 +2,7 @@
   "name": "code-duel",
   "version": "2.3.2",
   "description": "Code Duel v2 — ระบบประลองการเขียนโปรแกรมเชิงแข่งขันแบบเรียลไทม์ รันโค้ดในคอนเทนเนอร์ Docker",
+  "license": "MIT",
   "main": "server.js",
   "scripts": {
     "preinstall": "node check.js --warn",
